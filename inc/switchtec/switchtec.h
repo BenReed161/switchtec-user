@@ -1183,6 +1183,7 @@ enum switchtec_diag_link {
 
 struct switchtec_diag_ltssm_log {
 	unsigned int timestamp;
+	unsigned int timestamp_high;
 	float link_rate;
 	int link_state;
 };

@@ -126,10 +126,11 @@ static int ltssm_log(int argc, char **argv) {
 		DEVICE_OPTION, PORT_OPTION, {}
 	};
 
-	struct switchtec_diag_ltssm_log output[128];
+	struct switchtec_diag_ltssm_log output[1024];
 	int ret;
 	int port;
-	int log_count = 128;
+	int log_count;
+
 	int i;
 
 	ret = diag_parse_common_cfg(argc, argv, CMD_DESC_LTSSM_LOG,
@@ -143,17 +144,18 @@ static int ltssm_log(int argc, char **argv) {
 		return 0;
 	}
 	port = cfg.port_id;
+	log_count = sizeof(output);
 	ret = switchtec_diag_ltssm_log(cfg.dev, port, &log_count, output);
 	if (ret) {
 		switchtec_perror("ltssm_log");
 		return ret;
 	}
 
-	printf("LTSSM Log for Physical Port %d (autowrap ON)\n\n", port);
+	printf("LTSSM Log for Physical Port %d (autowrap ON), LC:%d\n\n", port, log_count);
 	printf("Idx\tDelta Time\tPCIe Rate\tState\n");
 	for(i = 0; i < log_count ; i++) {
 		printf("%3d\t", i);
-		printf("%09x\t", output[i].timestamp);
+		printf("%02x%08x\t", output[i].timestamp_high, output[i].timestamp);
 		printf("%.1fG\t\t", output[i].link_rate);
 		printf("%s\n", switchtec_ltssm_str(output[i].link_state, 1));
 	}
