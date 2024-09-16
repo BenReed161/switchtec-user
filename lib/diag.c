@@ -191,26 +191,40 @@ int switchtec_diag_eye_set_mode(struct switchtec_dev *dev,
  */
 int switchtec_diag_eye_start(struct switchtec_dev *dev, int lane_mask[4],
 			     struct range *x_range, struct range *y_range,
-			     int step_interval)
+			     int step_interval, int capture_depth)
 {
-	int err;
-	int ret;
-	struct switchtec_diag_port_eye_start in = {
-		.sub_cmd = MRPC_EYE_OBSERVE_START,
-		.lane_mask[0] = lane_mask[0],
-		.lane_mask[1] = lane_mask[1],
-		.lane_mask[2] = lane_mask[2],
-		.lane_mask[3] = lane_mask[3],
-		.x_start = x_range->start,
-		.y_start = y_range->start,
-		.x_end = x_range->end,
-		.y_end = y_range->end,
-		.x_step = x_range->step,
-		.y_step = y_range->step,
-		.step_interval = step_interval,
-	};
+	int err, ret, out;
+	if (switchtec_is_gen5(dev)) {
+		struct switchtec_gen5_diag_eye_run_in in = {
+			.sub_cmd = MRPC_EYE_CAP_RUN_GEN5,
+			.capture_depth = capture_depth,
+			.timeout_disable = 1,
+			.lane_mask[0] = lane_mask[0],
+			.lane_mask[1] = lane_mask[1],
+			.lane_mask[2] = lane_mask[2],
+			.lane_mask[3] = lane_mask[3],
+		};
 
-	ret = switchtec_diag_eye_cmd(dev, &in, sizeof(in));
+		ret = switchtec_cmd(dev, MRPC_GEN5_EYE_CAPTURE, &in, sizeof(in),
+					(void*)&out, sizeof(out));
+	} else {
+		struct switchtec_diag_port_eye_start in = {
+			.sub_cmd = MRPC_EYE_OBSERVE_START,
+			.lane_mask[0] = lane_mask[0],
+			.lane_mask[1] = lane_mask[1],
+			.lane_mask[2] = lane_mask[2],
+			.lane_mask[3] = lane_mask[3],
+			.x_start = x_range->start,
+			.y_start = y_range->start,
+			.x_end = x_range->end,
+			.y_end = y_range->end,
+			.x_step = x_range->step,
+			.y_step = y_range->step,
+			.step_interval = step_interval,
+		};
+
+		ret = switchtec_diag_eye_cmd(dev, &in, sizeof(in));
+	}
 
 	/* Add delay so hardware has enough time to start */
 	err = errno;
@@ -321,6 +335,17 @@ int switchtec_diag_eye_cancel(struct switchtec_dev *dev)
 
 	return ret;
 }
+
+/**
+ * @brief Read data from an Eye Capture
+ * @param[in]  dev	       Switchtec device handle
+ * @param[in]  lane_id	   Lane ID for the capture data
+ * @param[in]  bin		   Bin number [0-63]
+ * @param[out] num_phases  Total number of phases (30 or 60)
+ * @param[out] ber_data	   BER for each phase for this bin
+ * 
+ * @return 0 on success, error code on failure
+ */
 
 /**
  * @brief Setup Loopback Mode

@@ -31,6 +31,7 @@
 
 #include <switchtec/switchtec.h>
 #include <switchtec/utils.h>
+#include <switchtec/endian.h>
 
 #include <limits.h>
 #include <locale.h>
@@ -325,7 +326,9 @@ static void print_eye_csv(FILE *f, struct range *X, struct range *Y,
 	int x, y, i, j = 0;
 
 	fprintf(f, "%s\n", title);
-	fprintf(f, "interval_ms, %d\n", interval);
+
+	if (interval > -1)
+		fprintf(f, "interval_ms, %d\n", interval);
 
 	for_range(x, X)
 		fprintf(f, ", %d", x);
@@ -1190,7 +1193,7 @@ static double *eye_observe_dev(struct switchtec_dev *dev, int port_id,
 		goto out_err;
 	}
 
-	ret = switchtec_diag_eye_start(dev, lane_mask, X, Y, interval);
+	ret = switchtec_diag_eye_start(dev, lane_mask, X, Y, interval, 0);
 	if (ret) {
 		switchtec_perror("eye_start");
 		goto out_err;
@@ -1249,7 +1252,8 @@ out_err:
 
 static int eye_graph(enum output_format fmt, struct range *X, struct range *Y,
 		     double *pixels, const char *title,
-		     struct switchtec_diag_cross_hair *ch)
+		     struct switchtec_diag_cross_hair *ch,
+		     struct switchtec_dev *dev)
 {
 	size_t pixel_cnt = RANGE_CNT(X) * RANGE_CNT(Y);
 	int data[pixel_cnt], shades[pixel_cnt];
@@ -1277,14 +1281,129 @@ static int eye_graph(enum output_format fmt, struct range *X, struct range *Y,
 	}
 
 	if (fmt == FMT_TEXT) {
-		graph_draw_text(X, Y, data, title, 'T', 'V');
+		if (switchtec_is_gen5(dev))
+			graph_draw_text_no_invert(X, Y, data, title, 'P', 'B');
+		else
+			graph_draw_text(X, Y, data, title, 'T', 'V');
 		if (status_ptr)
 			printf("\n      %s\n", status_ptr);
 		return 0;
 	}
 
-	return graph_draw_win(X, Y, data, shades, title, 'T', 'V',
-			      status_ptr, NULL, NULL);
+	if (switchtec_is_gen5(dev))
+		return graph_draw_win(X, Y, data, shades, title, 'P', 'B',
+			      	status_ptr, NULL, NULL);
+	else
+		return graph_draw_win(X, Y, data, shades, title, 'T', 'V',
+			      	status_ptr, NULL, NULL);
+}
+
+static int switchtec_gen5_diag_eye_read(struct switchtec_dev *dev, int lane_id,
+				int bin, int* num_phases, double* ber_data)
+{
+	struct switchtec_gen5_diag_eye_read_in in = {
+		.sub_cmd = MRPC_EYE_CAP_READ_GEN5,
+		.lane_id = lane_id,
+		.bin = bin,
+	};
+	struct switchtec_gen5_diag_eye_read_out out;
+	int i, ret;
+
+	ret = switchtec_cmd(dev, MRPC_GEN5_EYE_CAPTURE, &in, sizeof(in),
+				&out, sizeof(out));
+	if (ret)
+		return ret;
+
+	*num_phases = out.num_phases;
+
+	for(i = 0; i < out.num_phases; i++) {
+		ber_data[i] = le64toh(out.ber_data[i]) / 281474976710656.;
+	}
+
+	return ret;
+}
+
+/*Gen5 eye capture logic*/
+static double *eye_capture_dev_gen5(struct switchtec_dev *dev,
+					int port_id, int lane_id, int num_lanes,
+					int capture_depth, int* num_phases, int* gen)
+{
+	int bin, j, ret, eye_status, first_lane, num_phases_l, stride;
+	int lane_mask[4] = {};
+	struct switchtec_status sw_status;
+	double tmp[60];
+	double* ber_data = NULL;
+	struct switchtec_gen5_diag_eye_status_in in = {
+		.sub_cmd = MRPC_EYE_CAP_STATUS_GEN5,
+	};
+	struct switchtec_gen5_diag_eye_status_out out;
+
+	ret = switchtec_calc_lane_mask(dev, port_id, lane_id, num_lanes,
+				       lane_mask, &sw_status);
+	if (ret < 0) {
+		switchtec_perror("Invalid lane");
+		return NULL;
+	}
+
+	ret = switchtec_diag_eye_start(dev, lane_mask, NULL, NULL, 0, capture_depth);
+	if (ret) {
+		switchtec_perror("eye_run");
+		return NULL;
+	}
+
+	do {
+		ret = switchtec_cmd(dev, MRPC_GEN5_EYE_CAPTURE, &in, sizeof(in),
+					&out, sizeof(out));
+		if (ret) {
+			switchtec_perror("eye_status");
+			return NULL;
+		}
+		eye_status = out.status;
+		usleep(200000);
+	} while (eye_status == SWITCHTEC_GEN5_DIAG_EYE_STATUS_IN_PROGRESS ||
+			 eye_status == SWITCHTEC_GEN5_DIAG_EYE_STATUS_PENDING);
+
+	switch (eye_status) {
+		case SWITCHTEC_GEN5_DIAG_EYE_STATUS_IDLE:
+			switchtec_perror("Eye capture idle");
+		case SWITCHTEC_GEN5_DIAG_EYE_STATUS_DONE:
+			break;
+		case SWITCHTEC_GEN5_DIAG_EYE_STATUS_TIMEOUT:
+			switchtec_perror("Eye capture timeout");
+		case SWITCHTEC_GEN5_DIAG_EYE_STATUS_ERROR:
+			switchtec_perror("Eye capture error");
+		return NULL;
+	}
+
+	first_lane = switchtec_calc_lane_id(dev, port_id, lane_id, NULL);
+	for (j = 0; j < num_lanes; j++) {
+		for (bin = 0; bin < 64; bin++) {
+			ret = switchtec_gen5_diag_eye_read(dev, first_lane + j, bin,
+						&num_phases_l, tmp);
+			if (ret) {
+				switchtec_perror("eye_read");
+				if (ber_data)
+					free(ber_data);
+				return NULL;
+			}
+
+			if (!ber_data) {
+				stride = 64 * num_phases_l;
+				ber_data = calloc(num_lanes * stride, sizeof(double));
+				if (!ber_data) {
+					perror("allocating BER data");
+					return NULL;
+				}
+			}
+
+			memcpy(&ber_data[(j * stride) + (bin * num_phases_l)], tmp,
+				   num_phases_l * sizeof(double));
+		}
+	}
+
+	*gen = sw_status.link_rate;
+	*num_phases = num_phases_l;
+	return ber_data;
 }
 
 #define CMD_DESC_EYE "Capture PCIe Eye Errors"
@@ -1294,13 +1413,14 @@ static int eye(int argc, char **argv)
 	struct switchtec_diag_cross_hair ch = {}, *ch_ptr = NULL;
 	char title[128], subtitle[50];
 	double *pixels = NULL;
-	int ret, gen;
+	int num_phases, ret, gen;
 
 	static struct {
 		struct switchtec_dev *dev;
 		int fmt;
 		int port_id;
 		int lane_id;
+		int capture_depth;
 		int num_lanes;
 		int mode;
 		struct range x_range, y_range;
@@ -1313,6 +1433,7 @@ static int eye(int argc, char **argv)
 		.fmt = FMT_DEFAULT,
 		.port_id = -1,
 		.lane_id = 0,
+		.capture_depth = 24,
 		.num_lanes = 1,
 		.mode = SWITCHTEC_DIAG_EYE_RAW,
 		.x_range.start = 0,
@@ -1327,7 +1448,7 @@ static int eye(int argc, char **argv)
 		DEVICE_OPTION_OPTIONAL,
 		{"crosshair", 'C', "FILE", CFG_FILE_R, &cfg.crosshair_file,
 		 required_argument,
-		 "optionally, superimpose a crosshair CSV onto the result"},
+		 "optionally, superimpose a crosshair CSV onto the result (Not supported in Gen 5)"},
 		{"format", 'f', "FMT", CFG_CHOICES, &cfg.fmt, required_argument,
 		 "output format (default: " FMT_DEFAULT_STR ")",
 		 .choices=output_fmt_choices},
@@ -1357,12 +1478,24 @@ static int eye(int argc, char **argv)
 		 required_argument, "voltage step (default: 5)"},
 		{"interval", 'i', "NUM", CFG_NONNEGATIVE, &cfg.step_interval,
 		 required_argument, "step interval in ms (default: 1ms)"},
+		{"capture-depth", 'd', "NUM", CFG_POSITIVE, &cfg.capture_depth,
+		 required_argument, "capture depth (6 to 40; default: 24)"},
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_DESC_EYE, opts, &cfg,
 			sizeof(cfg));
 
+	if (cfg.dev != NULL && switchtec_is_gen5(cfg.dev)) {
+		cfg.y_range.start = 0;
+		cfg.y_range.end = 63;
+		cfg.y_range.step = 1;
+	}
+	
 	if (cfg.crosshair_file) {
+		if (switchtec_is_gen5(cfg.dev)) {
+			fprintf(stderr, "Crosshair superimpose not suppored in Gen 5\n");
+			return -1;
+		}
 		ret = load_crosshair_csv(cfg.crosshair_file, &ch, subtitle,
 					 sizeof(subtitle));
 		if (ret) {
@@ -1373,11 +1506,11 @@ static int eye(int argc, char **argv)
 
 		ch_ptr = &ch;
 	}
-
+	
 	if (cfg.plot_file) {
 		pixels = load_eye_csv(cfg.plot_file, &cfg.x_range,
-				&cfg.y_range, subtitle, sizeof(subtitle),
-				&cfg.step_interval);
+				      &cfg.y_range, subtitle, sizeof(subtitle),
+				      &cfg.step_interval);
 		if (!pixels) {
 			fprintf(stderr, "Unable to parse CSV file: %s\n",
 				cfg.plot_filename);
@@ -1433,12 +1566,23 @@ static int eye(int argc, char **argv)
 	}
 
 	if (!pixels) {
-		pixels = eye_observe_dev(cfg.dev, cfg.port_id, cfg.lane_id,
-				cfg.num_lanes, cfg.mode, cfg.step_interval,
-				&cfg.x_range, &cfg.y_range, &gen);
-		if (!pixels)
-			return -1;
+		if (switchtec_is_gen5(cfg.dev)) {
+			pixels = eye_capture_dev_gen5(cfg.dev, cfg.port_id, cfg.lane_id,
+				cfg.num_lanes, cfg.capture_depth, &num_phases,
+				&gen);
+			if (!pixels)
+				return -1;
 
+			cfg.x_range.end = num_phases - 1;
+		}
+		else {
+			pixels = eye_observe_dev(cfg.dev, cfg.port_id, cfg.lane_id,
+						 cfg.num_lanes, cfg.mode, 
+						 cfg.step_interval, &cfg.x_range, 
+						 &cfg.y_range, &gen);
+			if (!pixels)
+				return -1;
+		}
 		eye_set_title(title, cfg.port_id, cfg.lane_id, gen);
 	}
 
@@ -1451,7 +1595,7 @@ static int eye(int argc, char **argv)
 	}
 
 	ret = eye_graph(cfg.fmt, &cfg.x_range, &cfg.y_range, pixels, title,
-			ch_ptr);
+			ch_ptr, cfg.dev);
 
 	free(pixels);
 	return ret;
