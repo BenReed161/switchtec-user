@@ -1219,6 +1219,23 @@ static int parse_def_header(FILE *log_def_file, uint32_t *fw_version,
 	return 0;
 }
 
+static int append_ftdc_log_header(int fd, uint32_t sdk_def_version,
+								uint32_t fw_def_version)
+{
+	int ret;
+	char hdr_str_fmt[] = "##########################################\n"
+			     "## Parsed with FTDC log file from definition:\n"
+			     "## FW def version %08x\n"
+			     "## SDK def version %08x\n"
+			     "##########################################\n\n";
+	char hdr_str[512];
+
+	snprintf(hdr_str, 512, hdr_str_fmt, fw_def_version, sdk_def_version);
+	ret = write(fd, hdr_str, strlen(hdr_str));
+
+	return ret;
+}
+
 static int append_log_header(int fd, uint32_t sdk_version,
 			     uint32_t fw_version, int binary)
 {
@@ -1611,13 +1628,15 @@ int switchtec_parse_log(FILE *bin_log_file, FILE *log_def_file,
 		memset(info, 0, sizeof(*info));
 
 	if ((log_type != SWITCHTEC_LOG_PARSE_TYPE_APP) &&
-	    (log_type != SWITCHTEC_LOG_PARSE_TYPE_MAILBOX)) {
+	    (log_type != SWITCHTEC_LOG_PARSE_TYPE_MAILBOX) &&
+		(log_type != SWITCHTEC_LOG_PARSE_TYPE_FTDC)) {
 		errno = EINVAL;
 		return -errno;
 	}
 
-	ret = parse_log_header(bin_log_file, &fw_version_log,
-			       &sdk_version_log);
+	if (log_type != SWITCHTEC_LOG_PARSE_TYPE_FTDC)
+		ret = parse_log_header(bin_log_file, &fw_version_log,
+					&sdk_version_log);
 	if (ret)
 		return ret;
 	ret = parse_def_header(log_def_file, &fw_version_def,
@@ -1646,8 +1665,13 @@ int switchtec_parse_log(FILE *bin_log_file, FILE *log_def_file,
 	if (ret < 0)
 		return ret;
 
-	ret = append_log_header(fileno(parsed_log_file), sdk_version_log,
-				fw_version_log, 0);
+	if (log_type != SWITCHTEC_LOG_PARSE_TYPE_FTDC)
+		ret = append_log_header(fileno(parsed_log_file), sdk_version_log,
+					fw_version_log, 0);
+	else
+		ret = append_ftdc_log_header(fileno(parsed_log_file), sdk_version_def,
+					fw_version_def);
+
 	if (ret < 0)
 		return ret;
 
