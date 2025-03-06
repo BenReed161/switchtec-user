@@ -1121,6 +1121,45 @@ static int log_dump(int argc, char **argv)
 	return ret;
 }
 
+#define CMD_DESC_FTDC_LOG "FTDC firmware log to a file"
+
+static int ftdc_log_dump(int argc, char **argv)
+{
+	int ret;
+
+	static struct {
+		struct switchtec_dev *dev;
+		int out_fd;
+		const char *out_filename;
+		unsigned type;
+		const char *log_def_filename;
+		int format;
+	} cfg = {
+		.type = SWITCHTEC_LOG_RAM,
+		.out_fd = 0,
+		.format = LOG_FMT_BIN
+	};
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{"output_file", .cfg_type=CFG_FD_WR, .value_addr=&cfg.out_fd,
+		  .argument_type=optional_positional,
+		  .force_default="switchtec.log",
+		  .help="log output file"},
+		{NULL}};
+
+	argconfig_parse(argc, argv, CMD_DESC_LOG_DUMP, opts, &cfg, sizeof(cfg));
+
+
+
+	ret = switchtec_log_to_ftdc_file(cfg.dev, cfg.type, cfg.out_fd);
+	if (ret < 0)
+		switchtec_perror("log_dump");
+	else
+		fprintf(stderr, "\nLog saved to %s.\n", cfg.out_filename);
+
+	return ret;
+}
+
 #define CMD_DESC_LOG_PARSE "parse a binary app log or mailbox log to a text file"
 
 static int log_parse(int argc, char **argv)
@@ -2646,6 +2685,7 @@ static const struct cmd commands[] = {
 	CMD(evcntr_show, CMD_DESC_EVCNTR_SHOW),
 	CMD(evcntr_del, CMD_DESC_EVCNTR_DEL),
 	CMD(evcntr_wait, CMD_DESC_EVCNTR_WAIT),
+	CMD(ftdc_log_dump ,CMD_DESC_FTDC_LOG),
 	{},
 };
 

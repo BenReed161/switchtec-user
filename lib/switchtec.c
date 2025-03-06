@@ -1389,6 +1389,40 @@ static int log_b_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd)
 	return 0;
 }
 
+static int log_ftdc_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd)
+{
+	int ret;
+	int read = 0;
+	//int value = 0;
+	struct log_ftdc_retr_result res;
+	struct log_ftdc_retr cmd = {
+		.sub_cmd_id = sub_cmd_id,
+		.reserved = 0,
+		.req_seq = 0,
+	};
+	uint32_t length = sizeof(res.data);
+
+	cmd.req_seq = 0;
+	res.data[1] = 0;
+	
+	while ( !(res.data[1]) ) {
+		ret = switchtec_cmd(dev, MRPC_FTDC_LOG_DUMP, &cmd, sizeof(cmd),
+				    &res, sizeof(res));
+		if (ret)
+			return -1;
+
+		ret = write(fd, res.data, (res.data[0]+1)*4);
+		if (ret < 0)
+			return ret;
+
+		read += length;
+		cmd.req_seq++;
+	
+	}
+
+	return 0;
+}
+
 static int log_c_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd)
 {
 	int ret;
@@ -1492,6 +1526,22 @@ int switchtec_log_to_file(struct switchtec_dev *dev,
 	case SWITCHTEC_LOG_NVHDR:
 		return log_c_to_file(dev, MRPC_FWLOGRD_NVHDR, fd);
 	};
+
+	errno = EINVAL;
+	return -errno;
+}
+
+/**
+ * @brief Dump the Switchtec log data to a file
+ * @param[in]  dev          - Switchtec device handle
+ * @param[in]  type         - Type of log data to dump
+ * @param[in]  fd           - File descriptor to dump the data to
+ * @return 0 on success, error code on failure
+ */
+int switchtec_log_to_ftdc_file(struct switchtec_dev *dev,
+		enum switchtec_log_type type, int fd)
+{
+	return log_ftdc_to_file(dev, 0, fd);
 
 	errno = EINVAL;
 	return -errno;
