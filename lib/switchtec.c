@@ -691,7 +691,8 @@ const char *switchtec_strerror(void)
 	case ERR_STACKBIF_PORT_BOUND:
 		msg = "Port already bound"; break;
 		break;
-
+	case ERR_PAT_MON_DISABLED:
+		msg = "Pattern monitor is disabled"; break;
 	default: break;
 	}
 
