@@ -1000,6 +1000,7 @@ static int log_dump(int argc, char **argv)
 	const struct argconfig_choice types[] = {
 		{"RAM", SWITCHTEC_LOG_RAM, "dump the app log from RAM"},
 		{"FLASH", SWITCHTEC_LOG_FLASH, "dump the app log from flash"},
+		{"FTDC", SWITCHTEC_LOG_FTDC, "dump the FTDC firmware log"},
 		{"MEMLOG", SWITCHTEC_LOG_MEMLOG,
 		 "dump the Memlog info from flash in the last fatal error handling dump"},
 		{"REGS", SWITCHTEC_LOG_REGS,
@@ -1042,7 +1043,7 @@ static int log_dump(int argc, char **argv)
 		  .help="log output file"},
 		{"log_def", 'd', "DEF_FILE", CFG_FILE_R, &cfg.log_def_file,
 		  required_argument,
-		  "parse log output using specified log definition file (app log only)"},
+		  "parse log output using specified log definition file (app & ftdc log only)"},
 		{"type", 't', "TYPE", CFG_CHOICES, &cfg.type,
 		  required_argument,
 		 "log type to dump", .choices=types},
@@ -1061,7 +1062,8 @@ static int log_dump(int argc, char **argv)
 
 	if (boot_phase != SWITCHTEC_BOOT_PHASE_FW &&
 	    (cfg.type == SWITCHTEC_LOG_RAM ||
-	     cfg.type == SWITCHTEC_LOG_FLASH) &&
+	     cfg.type == SWITCHTEC_LOG_FLASH ||
+		 cfg.type == SWITCHTEC_LOG_FTDC) &&
 	    cfg.format == LOG_FMT_TXT &&
 	    cfg.log_def_file == NULL) {
 		fprintf(stderr, "Cannot generate text format log file in BL1/2 boot phase without\n"
@@ -1072,7 +1074,8 @@ static int log_dump(int argc, char **argv)
 
 	if (cfg.format == LOG_FMT_TXT &&
 	    (cfg.type != SWITCHTEC_LOG_RAM &&
-	     cfg.type != SWITCHTEC_LOG_FLASH)) {
+	     cfg.type != SWITCHTEC_LOG_FLASH &&
+		 cfg.type != SWITCHTEC_LOG_FTDC)) {
 		fprintf(stderr,
 			"INFO: Only BIN format is supported for the given log type,\n"
 			"dumping logs in binary format instead.\n");
@@ -1117,45 +1120,6 @@ static int log_dump(int argc, char **argv)
 
 	if (log_def_to_use)
 		fclose(log_def_to_use);
-
-	return ret;
-}
-
-#define CMD_DESC_FTDC_LOG "FTDC firmware log to a file"
-
-static int ftdc_log_dump(int argc, char **argv)
-{
-	int ret;
-
-	static struct {
-		struct switchtec_dev *dev;
-		int out_fd;
-		const char *out_filename;
-		unsigned type;
-		const char *log_def_filename;
-		int format;
-	} cfg = {
-		.type = SWITCHTEC_LOG_RAM,
-		.out_fd = 0,
-		.format = LOG_FMT_BIN
-	};
-	const struct argconfig_options opts[] = {
-		DEVICE_OPTION,
-		{"output_file", .cfg_type=CFG_FD_WR, .value_addr=&cfg.out_fd,
-		  .argument_type=optional_positional,
-		  .force_default="switchtec.log",
-		  .help="log output file"},
-		{NULL}};
-
-	argconfig_parse(argc, argv, CMD_DESC_LOG_DUMP, opts, &cfg, sizeof(cfg));
-
-
-
-	ret = switchtec_log_to_ftdc_file(cfg.dev, cfg.type, cfg.out_fd);
-	if (ret < 0)
-		switchtec_perror("log_dump");
-	else
-		fprintf(stderr, "\nLog saved to %s.\n", cfg.out_filename);
 
 	return ret;
 }
@@ -2685,7 +2649,6 @@ static const struct cmd commands[] = {
 	CMD(evcntr_show, CMD_DESC_EVCNTR_SHOW),
 	CMD(evcntr_del, CMD_DESC_EVCNTR_DEL),
 	CMD(evcntr_wait, CMD_DESC_EVCNTR_WAIT),
-	CMD(ftdc_log_dump ,CMD_DESC_FTDC_LOG),
 	{},
 };
 

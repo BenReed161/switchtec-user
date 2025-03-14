@@ -1389,40 +1389,6 @@ static int log_b_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd)
 	return 0;
 }
 
-static int log_ftdc_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd)
-{
-	int ret;
-	int read = 0;
-	//int value = 0;
-	struct log_ftdc_retr_result res;
-	struct log_ftdc_retr cmd = {
-		.sub_cmd_id = sub_cmd_id,
-		.reserved = 0,
-		.req_seq = 0,
-	};
-	uint32_t length = sizeof(res.data);
-
-	cmd.req_seq = 0;
-	res.data[1] = 0;
-	
-	while ( !(res.data[1]) ) {
-		ret = switchtec_cmd(dev, MRPC_FTDC_LOG_DUMP, &cmd, sizeof(cmd),
-				    &res, sizeof(res));
-		if (ret)
-			return -1;
-
-		ret = write(fd, res.data, (res.data[0]+1)*4);
-		if (ret < 0)
-			return ret;
-
-		read += length;
-		cmd.req_seq++;
-	
-	}
-
-	return 0;
-}
-
 static int log_c_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd)
 {
 	int ret;
@@ -1451,6 +1417,40 @@ static int log_c_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd)
 	ret = write(fd, &reply, sizeof(reply));
 	if (ret < 0)
 		return ret;
+
+	return 0;
+}
+
+static int log_d_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd)
+{
+	int ret;
+	int read = 0;
+
+	struct log_ftdc_retr_result res;
+	struct log_ftdc_retr cmd = {
+		.sub_cmd_id = sub_cmd_id,
+		.reserved = 0,
+		.req_seq = 0,
+	};
+	uint32_t length = sizeof(res.data);
+
+	cmd.req_seq = 0;
+	res.data[1] = 0;
+	
+	while ( !(res.data[1]) ) {
+		ret = switchtec_cmd(dev, MRPC_FTDC_LOG_DUMP, &cmd, sizeof(cmd),
+				    &res, sizeof(res));
+		if (ret)
+			return -1;
+
+		ret = write(fd, res.data, (res.data[0]+1)*4);
+		if (ret < 0)
+			return ret;
+
+		read += length;
+		cmd.req_seq++;
+	
+	}
 
 	return 0;
 }
@@ -1513,6 +1513,8 @@ int switchtec_log_to_file(struct switchtec_dev *dev,
 					     MRPC_FWLOGRD_FLASH_WITH_FLAG,
 					     MRPC_FWLOGRD_FLASH,
 					     fd, log_def_file, info);
+	case SWITCHTEC_LOG_FTDC:
+		return switchtec_log_to_ftdc_file(dev, MRPC_FWLOGRD_RAM, fd);
 	case SWITCHTEC_LOG_MEMLOG:
 		return log_b_to_file(dev, MRPC_FWLOGRD_MEMLOG, fd);
 	case SWITCHTEC_LOG_REGS:
@@ -1541,10 +1543,7 @@ int switchtec_log_to_file(struct switchtec_dev *dev,
 int switchtec_log_to_ftdc_file(struct switchtec_dev *dev,
 		enum switchtec_log_type type, int fd)
 {
-	return log_ftdc_to_file(dev, 0, fd);
-
-	errno = EINVAL;
-	return -errno;
+	return log_d_to_file(dev, type, fd);
 }
 
 static int parse_log_header(FILE *bin_log_file, uint32_t *fw_version,
