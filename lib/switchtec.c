@@ -1438,7 +1438,8 @@ static int log_c_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd)
 	return 0;
 }
 
-static int log_d_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd)
+static int log_d_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd, 
+			 FILE *log_def_file)
 {
 	int ret;
 	int read = 0;
@@ -1449,24 +1450,65 @@ static int log_d_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd)
 		.reserved = 0,
 		.req_seq = 0,
 	};
+	struct log_defs defs = {
+		.module_defs = NULL,
+		.num_alloc = 0};
 	uint32_t length = sizeof(res.data);
+	FILE *log_file;
+	int entry_idx = 0;
+	uint32_t fw_version = 0;
+	uint32_t sdk_version = 0;
+
+	if (log_def_file != NULL) {
+		ret = parse_def_header(log_def_file, &fw_version,
+				       &sdk_version);
+		if (ret)
+			return ret;
+		/* read the log definition file into defs */
+		ret = read_app_log_defs(log_def_file, &defs);
+		if (ret < 0)
+			return ret;
+	}
 
 	cmd.req_seq = 0;
 	res.data[1] = 0;
+
+	int count = (res.data[0]+1);
 	
 	while ( !(res.data[1]) ) {
 		ret = switchtec_cmd(dev, MRPC_FTDC_LOG_DUMP, &cmd, sizeof(cmd),
 				    &res, sizeof(res));
-		if (ret)
+		if (ret) {
+			free_log_defs(&defs);
 			return -1;
+		}
 
-		ret = write(fd, res.data, (res.data[0]+1)*4);
-		if (ret < 0)
-			return ret;
-
+		if (read == 0)
+			append_ftdc_log_header(fd, sdk_version, fw_version);
+		if (log_def_file == NULL) {
+			ret = write(fd, res.data, (res.data[0]+1)*4);
+			if (ret < 0)
+				return ret;
+		} else {
+			log_file = fdopen(fd, "w");
+			if (!log_file) {
+				free_log_defs(&defs);
+				return -1;
+			}
+			/* parse the log data and write it to a file */
+			ret = write_parsed_log(res.data, count,
+					       entry_idx, &defs,
+					       SWITCHTEC_LOG_PARSE_TYPE_APP,
+					       log_file,
+					       get_ts_factor(dev->gen));
+			if (ret < 0) {
+				free_log_defs(&defs);
+				return ret;
+			}
+			entry_idx += count;
+		}
 		read += length;
 		cmd.req_seq++;
-	
 	}
 
 	return 0;
@@ -1531,7 +1573,9 @@ int switchtec_log_to_file(struct switchtec_dev *dev,
 					     MRPC_FWLOGRD_FLASH,
 					     fd, log_def_file, info);
 	case SWITCHTEC_LOG_FTDC:
-		return switchtec_log_to_ftdc_file(dev, MRPC_FWLOGRD_RAM, fd);
+		return switchtec_log_to_ftdc_file(dev, 
+						 MRPC_FWLOGRD_RAM, fd,
+						 log_def_file);
 	case SWITCHTEC_LOG_MEMLOG:
 		return log_b_to_file(dev, MRPC_FWLOGRD_MEMLOG, fd);
 	case SWITCHTEC_LOG_REGS:
@@ -1558,9 +1602,9 @@ int switchtec_log_to_file(struct switchtec_dev *dev,
  * @return 0 on success, error code on failure
  */
 int switchtec_log_to_ftdc_file(struct switchtec_dev *dev,
-		enum switchtec_log_type type, int fd)
+		enum switchtec_log_type type, int fd, FILE *log_def_file)
 {
-	return log_d_to_file(dev, type, fd);
+	return log_d_to_file(dev, type, fd, log_def_file);
 }
 
 static int parse_log_header(FILE *bin_log_file, uint32_t *fw_version,
