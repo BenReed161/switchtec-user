@@ -402,7 +402,7 @@ int switchtec_log_to_file(struct switchtec_dev *dev,
 		enum switchtec_log_type type, int fd, FILE *log_def_file,
 		struct switchtec_log_file_info *info);
 int switchtec_log_to_ftdc_file(struct switchtec_dev *dev,
-		enum switchtec_log_type type, int fd);
+		enum switchtec_log_type type, int fd, FILE *log_def_file);
 int switchtec_parse_log(FILE *bin_log_file, FILE *log_def_file,
 			FILE *parsed_log_file,
 			enum switchtec_log_parse_type log_type,
