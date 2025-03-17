@@ -1496,7 +1496,7 @@ static int log_d_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd,
 				return -1;
 			}
 			/* parse the log data and write it to a file */
-			ret = write_parsed_log(res.data, count,
+			ret = write_parsed_log(res.data, 1,
 					       entry_idx, &defs,
 					       SWITCHTEC_LOG_PARSE_TYPE_APP,
 					       log_file,
@@ -1505,7 +1505,7 @@ static int log_d_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd,
 				free_log_defs(&defs);
 				return ret;
 			}
-			entry_idx += count;
+			entry_idx++;
 		}
 		read += length;
 		cmd.req_seq++;
