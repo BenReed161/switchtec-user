@@ -1458,6 +1458,7 @@ static int log_d_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd,
 	int entry_idx = 0;
 	uint32_t fw_version = 0;
 	uint32_t sdk_version = 0;
+	enum switchtec_gen gen_file = switchtec_fw_version_to_gen(0);
 
 	if (log_def_file != NULL) {
 		ret = parse_def_header(log_def_file, &fw_version,
@@ -1496,7 +1497,7 @@ static int log_d_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd,
 				return -1;
 			}
 			/* parse the log data and write it to a file */
-			ret = write_parsed_log(res.data, 1,
+			ret = write_parsed_log(res.data, length,
 					       entry_idx, &defs,
 					       SWITCHTEC_LOG_PARSE_TYPE_APP,
 					       log_file,
@@ -1505,7 +1506,7 @@ static int log_d_to_file(struct switchtec_dev *dev, int sub_cmd_id, int fd,
 				free_log_defs(&defs);
 				return ret;
 			}
-			entry_idx++;
+			entry_idx += length;
 		}
 		read += length;
 		cmd.req_seq++;
