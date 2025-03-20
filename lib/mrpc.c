@@ -47,6 +47,7 @@ const struct switchtec_mrpc switchtec_mrpc_table[MRPC_MAX_ID] = {
 	M(DIAG_PORT_LTSSM_LOG,		"LTSSM Monitor"),
 	M(DIAG_PORT_TLP_ANL,		"PCIe Analyzer"),
 	M(DIAG_PORT_LN_ADPT,		"Port Adaptation Objects"),
+	M(DIAG_TRACE_LOG,			"Trace log"),
 	M(SRDS_PCIE_PEAK,		"Receiver Peaking Control"),
 	M(SRDS_EQ_CTRL,			"Port Equalization Control"),
 	M(SRDS_LN_TUNING_MODE,		"Port Tuning Mode"),

@@ -2022,6 +2022,27 @@ static int refclk(int argc, char **argv)
 	return 0;
 }
 
+#define CMD_DESC_TRACE_LOG "Display the trace log"
+static int trace_log(int argc, char ** argv) {
+	int ret;
+/*
+	struct diag_common_cfg cfg = DEFAULT_DIAG_COMMON_CFG;
+
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION, {}
+	}; 
+	// Options needed in final implementation: 
+	// - 
+	ret = diag_parse_common_cfg(argc, argv, CMD_DESC_TRACE_LOG,
+				    &cfg, opts);
+	if (ret)
+		return ret; 
+*/
+	ret = 0;
+	printf("Trace log success\n");
+	return ret;
+}
+
 static const struct cmd commands[] = {
 	CMD(crosshair,		CMD_DESC_CROSS_HAIR),
 	CMD(eye,		CMD_DESC_EYE),
@@ -2035,6 +2056,7 @@ static const struct cmd commands[] = {
 	CMD(rcvr_obj,		CMD_DESC_RCVR_OBJ),
 	CMD(refclk,		CMD_DESC_REF_CLK),
 	CMD(ltssm_log,		CMD_DESC_LTSSM_LOG),
+	CMD(trace_log,		CMD_DESC_TRACE_LOG),
 	{}
 };
 
