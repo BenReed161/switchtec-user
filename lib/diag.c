@@ -1027,4 +1027,9 @@ int switchtec_diag_ltssm_log(struct switchtec_dev *dev,
 	return ret;
 }
 
+int switchtec_diag_trace_log() {
+	int ret = 0;
+	return ret;
+}
+
 /**@}*/
