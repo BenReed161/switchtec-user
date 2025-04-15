@@ -2043,7 +2043,7 @@ static int convert_str_to_dwords(char *str, uint32_t **dwords, int *num_dwords)
 
 	*dwords = (uint32_t *)malloc(*num_dwords * sizeof(uint32_t));
 	if (*dwords == NULL)
-		return 1;
+		return -1;
 
 	ptr = str;
 	for (int i = 0; i < *num_dwords; i++) {
@@ -2051,7 +2051,7 @@ static int convert_str_to_dwords(char *str, uint32_t **dwords, int *num_dwords)
 		(*dwords)[i] = (uint32_t)strtoul(ptr, &endptr, 0);
 		if (endptr == ptr || (*endptr != ' ' && *endptr != '\0')) {
 			free(*dwords);
-			return 1;
+			return -1;
 		}
 		ptr = endptr;
 		while (*ptr == ' ')
@@ -2074,7 +2074,9 @@ static int tlp_inject (int argc, char **argv)
 		int tlp_type;
 		int ecrc;
 		char * raw_tlp_data;
-	} cfg = {};
+	} cfg = {
+		.tlp_type = 0
+	};
 
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
@@ -2084,28 +2086,32 @@ static int tlp_inject (int argc, char **argv)
 			required_argument, "tlp type 0: P, 1: NP, 2: CP (default 0)"},
 		{"enable_ecrc", 'e', "", CFG_NONE, &cfg.ecrc, no_argument, 
 			"Enable the ecrc to be included at the end of the input data (Default: disabled)"},
-		{"tlp_data", 'd', "DW0 DW1 ... DW131", CFG_STRING, &cfg.raw_tlp_data, required_argument, 
-			"DW to be sent as part of the raw TLP (Maximum 132 DWs)"},
+		{"tlp_data", 'd', "\"DW0 DW1 ... DW131\"", CFG_STRING, &cfg.raw_tlp_data, required_argument, 
+			"DWs to be sent as part of the raw TLP (Maximum 132 DWs)"},
 		{NULL}
 	};
 
 	argconfig_parse(argc, argv, CMD_TLP_INJECT, opts, &cfg, sizeof(cfg));
 
 	if (cfg.raw_tlp_data == NULL) {
-		printf("ERR: tlp data is required!\n");
-		return 1;
+		fprintf(stderr, "Must set tlp data --tlp_data -d \n");
+		return -1;
 	}
 	ret = convert_str_to_dwords(cfg.raw_tlp_data, &raw_tlp_dwords, &num_dwords);
 	if (ret) {
-		switchtec_perror("tlp injection");
-		return 1;
+		fprintf(stderr, "Error with tlp data provided \n");
+		return -1;
+	}
+	if (num_dwords > 132) {
+		fprintf(stderr, "TLP data cannot exceed 132 dwords \n");
+		return -1;
 	}
 
 	ret = switchtec_tlp_inject(cfg.dev, cfg.port_id, cfg.tlp_type, 
 				   num_dwords, cfg.ecrc, raw_tlp_dwords);
 	if (ret != 0) {
-		switchtec_perror("tlp injection");
-		return 1;
+		switchtec_perror("tlp_inject");
+		return -1;
 	}
 
 	return 0;
