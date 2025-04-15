@@ -2080,10 +2080,10 @@ static int tlp_inject (int argc, char **argv)
 
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
-		{"dest_port", 'p', "PORT_ID", CFG_NONNEGATIVE, &cfg.port_id, 
+		{"port", 'p', "PORT_ID", CFG_NONNEGATIVE, &cfg.port_id, 
 			required_argument, "destination port ID"},
 		{"tlp_type", 't', "TYPE", CFG_NONNEGATIVE, &cfg.tlp_type, 
-			required_argument, "tlp type 0: P, 1: NP, 2: CP (default 0)"},
+			required_argument, "tlp type:\n0: P  - Posted\n1: NP - Non-posted\n2: CP - Completion\n(default 0)"},
 		{"enable_ecrc", 'e', "", CFG_NONE, &cfg.ecrc, no_argument, 
 			"Enable the ecrc to be included at the end of the input data (Default: disabled)"},
 		{"tlp_data", 'd', "\"DW0 DW1 ... DW131\"", CFG_STRING, &cfg.raw_tlp_data, required_argument, 
@@ -2104,6 +2104,7 @@ static int tlp_inject (int argc, char **argv)
 	}
 	if (num_dwords > 132) {
 		fprintf(stderr, "TLP data cannot exceed 132 dwords \n");
+		free(raw_tlp_dwords);
 		return -1;
 	}
 
