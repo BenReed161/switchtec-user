@@ -2086,7 +2086,8 @@ static int tlp_inject (int argc, char **argv)
 			required_argument, "tlp type:\n0: P  - Posted\n1: NP - Non-posted\n2: CP - Completion\n(default 0)"},
 		{"enable_ecrc", 'e', "", CFG_NONE, &cfg.ecrc, no_argument, 
 			"Enable the ecrc to be included at the end of the input data (Default: disabled)"},
-		{"tlp_data", 'd', "\"DW0 DW1 ... DW131\"", CFG_STRING, &cfg.raw_tlp_data, required_argument, 
+		{"tlp_data", 'd', "\"DW0 DW1 ... DW131\"", CFG_STRING, 
+			&cfg.raw_tlp_data, required_argument, 
 			"DWs to be sent as part of the raw TLP (Maximum 132 DWs)"},
 		{NULL}
 	};
@@ -2097,7 +2098,8 @@ static int tlp_inject (int argc, char **argv)
 		fprintf(stderr, "Must set tlp data --tlp_data -d \n");
 		return -1;
 	}
-	ret = convert_str_to_dwords(cfg.raw_tlp_data, &raw_tlp_dwords, &num_dwords);
+	ret = convert_str_to_dwords(cfg.raw_tlp_data, &raw_tlp_dwords, 
+				    &num_dwords);
 	if (ret) {
 		fprintf(stderr, "Error with tlp data provided \n");
 		return -1;
