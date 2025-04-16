@@ -2120,6 +2120,46 @@ static int tlp_inject (int argc, char **argv)
 	return 0;
 }
 
+#define CMD_ORDERED_SET_ANALYZER "Ordered set analyzer"
+
+static int osa(int argc, char **argv)
+{
+	static struct {
+		struct switchtec_dev *dev;
+		int stack_id;
+		int lane_id;
+		int direction;
+	} cfg = {
+	};
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
+		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		{"land_id", 's', "LANE_ID", CFG_INT, &cfg.lane_id, 
+		required_argument,"lane ID"},
+		{"direction", 'd', "0/1", CFG_INT, &cfg.direction, 
+		required_argument,"direction tx: 0 rx: 1"},
+		{NULL}};
+	return 0;
+}
+
+#define CMD_ORDERED_SET_ANALYZER_CONF "Ordered set analyzer configure"
+
+static int osa_config(int argc, char **argv)
+{
+	static struct {
+		struct switchtec_dev *dev;
+		int stack_id;
+		int lane_id;
+		int direction;
+	} cfg = {
+	};
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{NULL}};
+	return 0;
+}
+
 static const struct cmd commands[] = {
 	CMD(crosshair,		CMD_DESC_CROSS_HAIR),
 	CMD(eye,		CMD_DESC_EYE),
@@ -2134,6 +2174,8 @@ static const struct cmd commands[] = {
 	CMD(refclk,		CMD_DESC_REF_CLK),
 	CMD(ltssm_log,		CMD_DESC_LTSSM_LOG),
 	CMD(tlp_inject,		CMD_TLP_INJECT),
+	CMD(osa, 		CMD_ORDERED_SET_ANALYZER),
+	CMD(osa_config, 	CMD_ORDERED_SET_ANALYZER_CONF),
 	{}
 };
 

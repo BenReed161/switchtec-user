@@ -1236,4 +1236,164 @@ int switchtec_tlp_inject(struct switchtec_dev * dev, int port_id, int tlp_type,
 	return ret;
 }
 
+int switchtec_osa_config(struct switchtec_dev * dev, int stack_id, int lane_id, 
+	int direction, int type_en, int pattern_en, int misc_en, int lane_mask,
+	int link_rate, int os_types)
+{
+	int ret = 1;
+	
+	struct {
+		uint8_t sub_cmd; //subcommand 0
+		uint8_t stack_id;
+		uint16_t reserved;
+		uint16_t lane_mask;
+		uint8_t direction;
+		uint8_t link_rate;
+		uint8_t os_types;
+		uint8_t reserved2;
+		uint16_t reserved3;
+	} osa_type_config_in;
+	
+	struct {
+		uint8_t sub_cmd; //subcommand 1
+		uint8_t stack_id;
+		uint16_t reserved;
+		uint16_t lane_mask;
+		uint8_t direction;
+		uint8_t link_rate;
+		uint32_t pat_val_dword0;
+		uint32_t pat_val_dword1;
+		uint32_t pat_val_dword2;
+		uint32_t pat_val_dword3;
+		uint32_t pat_mask_dword0;
+		uint32_t pat_mask_dword1;
+		uint32_t pat_mask_dword2;
+		uint32_t pat_mask_dword3;
+	} osa_pattern_config_in;
+	
+	struct {
+		uint8_t sub_cmd; //subcommand 2
+		uint8_t stack_id;
+		uint16_t reserved;
+		uint8_t trigger_en;
+		uint8_t reserved2;
+		uint16_t reserved3;
+	} osa_misc_config_in;
+
+	struct {
+		uint8_t sub_cmd; //subcommand 3
+		uint8_t stack_id;
+		uint16_t reserved;
+		uint16_t lane_mask;
+		uint8_t direction;
+		uint8_t drop_single_os;
+		uint8_t stop_mode;
+		uint8_t snapshot_mode;
+		uint16_t post_trig_entries;
+		uint8_t os_types;
+		uint8_t reserved2;
+		uint16_t reserved3;
+	} osa_capture_ctrl_in;
+
+	struct {
+		uint8_t sub_cmd; //subcommand 5
+		uint8_t stack_id;
+		uint8_t operation;
+		uint8_t reserved;
+	} osa_op_in;
+
+	//Reset the OSA settings
+	osa_op_in.sub_cmd = MRPC_OSA_ANALYZER_OP;
+	osa_op_in.stack_id = stack_id;
+	osa_op_in.operation = 3; //reset
+	//send reset to osa analyzer config
+	ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER, &osa_op_in, 
+		sizeof(osa_op_in), NULL, 0);
+	
+	//check for different configs enabled
+	if (type_en) {
+		osa_type_config_in.sub_cmd = MRPC_OSA_TYPE_TRIG_CONFIG;
+		osa_type_config_in.stack_id = stack_id;
+		osa_type_config_in.lane_mask = lane_mask;
+		osa_type_config_in.direction = direction;
+		osa_type_config_in.link_rate = link_rate;
+		osa_type_config_in.os_types = os_types;
+		ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER, &osa_type_config_in,
+				sizeof(osa_type_config_in), NULL, 0);
+		if (ret)
+			return -1;
+		printf("OSA: Enabled type triggering config\n");
+	}
+	if (pattern_en) {
+		osa_pattern_config_in.sub_cmd = MRPC_OSA_PAT_TRIG_CONFIG;
+		osa_pattern_config_in.stack_id = stack_id;
+		osa_pattern_config_in.lane_mask = lane_mask;
+		osa_pattern_config_in.link_rate = link_rate;
+		osa_pattern_config_in.direction = direction;
+		//set values and masks using parsed string arrys to dwords.
+		//set with loop
+	}
+	if (misc_en) {
+
+	}
+}
+
+int switchtec_osa(struct switchtec_dev * dev, int stack_id, int lane_id, 
+	int direction, int lane_mask, int link_rate, int os_types)
+{
+	int ret = 1;
+
+	struct {
+		uint8_t sub_cmd; //subcommand 5
+		uint8_t stack_id;
+		uint8_t operation;
+		uint8_t reserved;
+	} osa_op_in;
+
+	struct {
+		uint8_t sub_cmd; //subcommand 6
+		uint8_t stack_id;
+		uint16_t reserved;
+	} osa_status_query_in;
+
+	struct {
+		uint8_t state;
+		uint8_t trigger_lane;
+		uint8_t trigger_dir;
+		uint8_t reserved;
+		uint16_t trigger_reason;
+		uint16_t reserved2;
+	} osa_status_query_out;
+
+	struct {
+		uint8_t sub_cmd; // subcommand 7
+		uint8_t stack_id;
+		uint8_t lane;
+		uint8_t direction;
+		uint16_t start_entry;
+		uint8_t num_entries;
+		uint8_t reserved;
+	} osa_data_read_in;
+
+	struct {
+		uint8_t entries_read;
+		uint8_t stack_id;
+		uint8_t lane;
+		uint8_t direction;
+		uint16_t next_entry;
+		uint16_t entries_remaining;
+		uint16_t wrap;
+		uint16_t reserved;
+		uint32_t entry_dwords[]
+	} osa_data_read_out;
+
+	struct {
+		uint8_t sub_cmd; //subcommand 8
+		uint8_t stack_id;
+		uint16_t reserved;
+	} osa_rel_access_perm_in;
+
+	return ret;
+}
+
 /**@}*/
