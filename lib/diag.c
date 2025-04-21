@@ -1427,16 +1427,7 @@ int switchtec_osa(struct switchtec_dev * dev, int stack_id, int lane_id,
 		uint8_t stack_id;
 		uint16_t reserved;
 	} osa_rel_access_perm_in;
-
-	osa_op_in.stack_id = stack_id;
-	osa_op_in.sub_cmd = MRPC_OSA_ANALYZER_OP;
-	osa_op_in.operation = 3;
-	ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER, &osa_op_in, sizeof(osa_op_in), NULL, 0);
-	if (ret) {
-		switchtec_perror("err1");
-		return ret;
-	}
-
+	
 	// Setup command dmp to check for valid config
 	osa_dmp_in.stack_id = stack_id;
 	osa_dmp_in.sub_cmd = MRPC_OSA_CONFIG_DMP;
