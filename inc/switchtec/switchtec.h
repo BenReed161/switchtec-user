@@ -1245,6 +1245,11 @@ int switchtec_diag_ltssm_log(struct switchtec_dev *dev,
 			     struct switchtec_diag_ltssm_log *log_data);
 int switchtec_tlp_inject(struct switchtec_dev * dev, int port_id, int tlp_type, 
 			 int tlp_length, int ecrc, uint32_t * raw_tlp_data);
+			
+int switchtec_osa(struct switchtec_dev * dev, int stack_id, int lane_id, 
+			int direction);
+int switchtec_osa_config_type(struct switchtec_dev * dev, int stack_id, 
+			int direction, int lane_mask, int link_rate, int os_types);
 #ifdef __cplusplus
 }
 #endif

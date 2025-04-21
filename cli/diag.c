@@ -2129,8 +2129,7 @@ static int osa(int argc, char **argv)
 		int stack_id;
 		int lane_id;
 		int direction;
-	} cfg = {
-	};
+	} cfg;
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
 		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
@@ -2140,23 +2139,45 @@ static int osa(int argc, char **argv)
 		{"direction", 'd', "0/1", CFG_INT, &cfg.direction, 
 		required_argument,"direction tx: 0 rx: 1"},
 		{NULL}};
+
+	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, sizeof(cfg));
+
+	switchtec_osa(cfg.dev, cfg.stack_id, cfg.lane_id, cfg.direction);
 	return 0;
 }
 
-#define CMD_ORDERED_SET_ANALYZER_CONF "Ordered set analyzer configure"
+#define CMD_ORDERED_SET_ANALYZER_CONF "Ordered set analyzer configure type"
 
-static int osa_config(int argc, char **argv)
+static int osa_config_type(int argc, char **argv)
 {
 	static struct {
 		struct switchtec_dev *dev;
 		int stack_id;
-		int lane_id;
+		int lane_mask;
 		int direction;
-	} cfg = {
-	};
+		int link_rate;
+		int os_types;
+	} cfg;
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
+		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
+		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		{"lane_mask", 'm', "LANE_MASK", CFG_INT, &cfg.lane_mask, 
+		required_argument,"lane ID"},
+		{"direction", 'd', "0/1", CFG_INT, &cfg.direction, 
+		required_argument,"direction tx: 0 rx: 1"},
+		{"link_rate", 'r', "LANE_MASK", CFG_INT, &cfg.link_rate, 
+		required_argument,"lane ID"},
+		{"os_types", 't', "LANE_MASK", CFG_INT, &cfg.os_types, 
+		required_argument,"lane ID"},
 		{NULL}};
+	
+	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, sizeof(cfg));
+
+	switchtec_osa_config_type(cfg.dev, cfg.stack_id, cfg.direction, cfg.lane_mask,
+					cfg.link_rate, cfg.os_types);
+
+
 	return 0;
 }
 
@@ -2175,7 +2196,7 @@ static const struct cmd commands[] = {
 	CMD(ltssm_log,		CMD_DESC_LTSSM_LOG),
 	CMD(tlp_inject,		CMD_TLP_INJECT),
 	CMD(osa, 		CMD_ORDERED_SET_ANALYZER),
-	CMD(osa_config, 	CMD_ORDERED_SET_ANALYZER_CONF),
+	CMD(osa_config_type, 	CMD_ORDERED_SET_ANALYZER_CONF),
 	{}
 };
 
