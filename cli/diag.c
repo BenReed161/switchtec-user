@@ -2127,22 +2127,19 @@ static int osa(int argc, char **argv)
 	static struct {
 		struct switchtec_dev *dev;
 		int stack_id;
-		int lane_id;
-		int direction;
+		int operation;
 	} cfg;
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
 		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
 		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
-		{"land_id", 's', "LANE_ID", CFG_INT, &cfg.lane_id, 
-		required_argument,"lane ID"},
-		{"direction", 'd', "0/1", CFG_INT, &cfg.direction, 
-		required_argument,"direction tx: 0 rx: 1"},
+		{"operation", 'o', "0/1/2/3", CFG_INT, &cfg.operation, 
+		required_argument,"operations:\n- stop:0\n- start:1\n- trigger:2\n- reset:3"},
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, sizeof(cfg));
 
-	switchtec_osa(cfg.dev, cfg.stack_id, cfg.lane_id, cfg.direction);
+	switchtec_osa(cfg.dev, cfg.stack_id, cfg.operation);
 	return 0;
 }
 
@@ -2172,12 +2169,126 @@ static int osa_config_type(int argc, char **argv)
 		required_argument,"lane ID"},
 		{NULL}};
 	
-	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, sizeof(cfg));
+	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_CONF, opts, &cfg, sizeof(cfg));
 
 	switchtec_osa_config_type(cfg.dev, cfg.stack_id, cfg.direction, cfg.lane_mask,
 					cfg.link_rate, cfg.os_types);
 
+	return 0;
+}
 
+#define CMD_ORDERED_SET_ANALYZER_PAT_CONF "Ordered set analyzer configure pattern"
+
+static int osa_config_pat(int argc, char **argv)
+{
+	static struct {
+		struct switchtec_dev *dev;
+		int stack_id;
+		int trigger_en;
+	} cfg;
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
+		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		{"trigger_en", 't', "ENABLED", CFG_INT, &cfg.trigger_en,
+		required_argument,"enable the trigger"}, 
+		{NULL}};
+
+	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_CONF, opts, &cfg, sizeof(cfg));
+	return 0;
+}
+
+#define CMD_ORDERED_SET_ANALYZER_MISC_CONF "Ordered set analyzer configure misc"
+
+static int osa_config_misc(int argc, char **argv)
+{
+	static struct {
+		struct switchtec_dev *dev;
+		int stack_id;
+		int trigger_en;
+	} cfg;
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
+		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		{"trigger_en", 't', "ENABLED", CFG_INT, &cfg.trigger_en,
+		required_argument,"enable the trigger"}, 
+		{NULL}};
+	
+	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_MISC_CONF, opts, &cfg, sizeof(cfg));
+
+	switchtec_osa_config_misc(cfg.dev, cfg.stack_id, cfg.trigger_en);
+
+	return 0;
+}
+
+#define CMD_ORDERED_SET_ANALYZER_CAP_CTRL "Ordered set analyzer capture control"
+
+static int osa_capture_contol(int argc, char **argv)
+{
+	static struct {
+		struct switchtec_dev *dev;
+		int stack_id;
+		int lane_mask;
+		int direction;
+		int drop_single_os;
+		int stop_mode;
+		int snapshot_mode;
+		int post_trig_entries;
+		int os_types;
+	} cfg;
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
+		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		{"lane_mask", 'm', "LANE_MASK", CFG_INT, &cfg.lane_mask, 
+		required_argument},
+		{"direction", 'd', "0/1", CFG_INT, &cfg.direction, 
+		required_argument},
+		{"drop_single_os", 'o', "drop_single_os", CFG_INT, &cfg.drop_single_os, 
+		required_argument},
+		{"stop_mode", 'e', "stop_mode", CFG_INT, &cfg.stop_mode, 
+		required_argument},
+		{"snapshot_mode", 'n', "snapshot_mode", CFG_INT, &cfg.snapshot_mode, 
+		required_argument},
+		{"post_trig_entries", 'p', "post_trig_entries", CFG_INT, &cfg.post_trig_entries, 
+		required_argument},
+		{"os_types", 't', "os_types", CFG_INT, &cfg.os_types, 
+		required_argument},
+		{NULL}};
+	
+	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_CAP_CTRL, opts, &cfg, sizeof(cfg));
+
+	switchtec_osa_capture_control(cfg.dev, cfg.stack_id, cfg.lane_mask, cfg.direction,
+				cfg.drop_single_os, cfg.stop_mode, cfg.snapshot_mode,
+				cfg.post_trig_entries, cfg.os_types);
+
+	return 0;
+}
+
+#define CMD_ORDERED_SET_ANALYZER_DUMP_CONF "dump osa config"
+
+static int osa_dump_config(int argc, char **argv)
+{
+	static struct {
+		struct switchtec_dev *dev;
+		int stack_id;
+		int lane_id;
+		int direction;
+	} cfg;
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
+		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		{"land_id", 's', "LANE_ID", CFG_INT, &cfg.lane_id, 
+		required_argument,"lane ID"},
+		{"direction", 'd', "0/1", CFG_INT, &cfg.direction, 
+		required_argument,"direction tx: 0 rx: 1"},
+		{NULL}};
+
+	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, sizeof(cfg));
+
+	switchtec_osa_dump_conf(cfg.dev, cfg.stack_id);
 	return 0;
 }
 
@@ -2197,6 +2308,10 @@ static const struct cmd commands[] = {
 	CMD(tlp_inject,		CMD_TLP_INJECT),
 	CMD(osa, 		CMD_ORDERED_SET_ANALYZER),
 	CMD(osa_config_type, 	CMD_ORDERED_SET_ANALYZER_CONF),
+	CMD(osa_config_pat,	CMD_ORDERED_SET_ANALYZER_PAT_CONF),
+	CMD(osa_config_misc,	CMD_ORDERED_SET_ANALYZER_MISC_CONF),
+	CMD(osa_capture_contol, CMD_ORDERED_SET_ANALYZER_CAP_CTRL),
+	CMD(osa_dump_config,	CMD_ORDERED_SET_ANALYZER_DUMP_CONF),
 	{}
 };
 
