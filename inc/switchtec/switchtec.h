@@ -1254,6 +1254,9 @@ int switchtec_osa_capture_control(struct switchtec_dev * dev, int stack_id, int 
 			int direction, int drop_single_os, int stop_mode,
 			int snapshot_mode, int post_trigger, int os_types);
 int switchtec_osa_dump_conf(struct switchtec_dev * dev, int stack_id);
+int switchtec_osa_config_pattern(struct switchtec_dev * dev, int stack_id, 
+			int direction, int lane_mask,int link_rate, 
+			uint32_t * value_data, uint32_t * mask_data);
 #ifdef __cplusplus
 }
 #endif
