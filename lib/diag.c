@@ -1236,6 +1236,137 @@ int switchtec_tlp_inject(struct switchtec_dev * dev, int port_id, int tlp_type,
 	return ret;
 }
 
+int switchtec_osa_capture_data(struct switchtec_dev * dev, int stack_id, int lane,
+				int direction)
+{
+	int ret = 0;
+	struct {
+		uint8_t sub_cmd; // subcommand 7
+		uint8_t stack_id;
+		uint8_t lane;
+		uint8_t direction;
+		uint16_t start_entry;
+		uint8_t num_entries;
+		uint8_t reserved;
+	} osa_data_read_in;
+
+	struct {
+		uint8_t entries_read;
+		uint8_t stack_id;
+		uint8_t lane;
+		uint8_t direction;
+		uint16_t next_entry;
+		uint16_t entries_remaining;
+		uint16_t wrap;
+		uint16_t reserved;
+	} osa_data_entries_out; // Structure used to capture total entries.
+
+	osa_data_read_in.sub_cmd = MRPC_OSA_DATA_READ;
+	osa_data_read_in.stack_id = stack_id;
+	osa_data_read_in.lane = lane;
+	osa_data_read_in.direction = direction;
+	//Set to zero to get the entries remaining in the data
+	osa_data_read_in.start_entry = 0;
+	osa_data_read_in.num_entries = 0;
+
+	struct {
+		uint8_t sub_cmd; //subcommand 6
+		uint8_t stack_id;
+		uint16_t reserved;
+	} osa_status_query_in;
+
+	struct {
+		uint8_t state;
+		uint8_t trigger_lane;
+		uint8_t trigger_dir;
+		uint8_t reserved;
+		uint16_t trigger_reason;
+		uint16_t reserved2;
+	} osa_status_query_out;
+
+	osa_status_query_in.sub_cmd = MRPC_OSA_STATUS_QUERY;
+	osa_status_query_in.stack_id = stack_id;
+
+	ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER, &osa_status_query_in, 
+		sizeof(osa_status_query_in), &osa_status_query_out, 
+		sizeof(osa_status_query_out));
+
+	printf("Current status of stack %d\n", stack_id);
+	printf("state: %d\n", osa_status_query_out.state);
+	printf("trigger_lane: %d\n", osa_status_query_out.trigger_lane);
+	printf("trigger_dir: %d\n", osa_status_query_out.trigger_dir);
+	printf("trigger_reason: %d\n", osa_status_query_out.trigger_reason);
+
+	// Get the entries remaining
+	ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER, &osa_data_read_in, 
+			    sizeof(osa_data_read_in), &osa_data_entries_out, 
+			    sizeof(osa_data_entries_out));
+	if (ret) {
+		switchtec_perror("OSA data dump");
+		return ret;
+	}
+	printf("OSA: Captured Data \n");
+	/* 
+	printf("entries_remaining: %d\n", osa_data_entries_out.entries_remaining);
+	printf("entries_read: %d\n", osa_data_entries_out.entries_read);
+	printf("next_entry: %d\n", osa_data_entries_out.next_entry); 
+	*/
+
+	struct {
+		uint8_t entries_read;
+		uint8_t stack_id;
+		uint8_t lane;
+		uint8_t direction;
+		uint16_t next_entry;
+		uint16_t entries_remaining;
+		uint16_t wrap;
+		uint16_t reserved;
+		uint32_t entry_dwords[osa_data_entries_out.entries_remaining * 6];
+	} osa_data_read_out;
+
+	osa_data_read_out.entries_remaining = osa_data_entries_out.entries_remaining;
+	osa_data_read_out.next_entry = osa_data_entries_out.next_entry;
+
+	while (osa_data_read_out.entries_remaining != 0) {
+		
+		osa_data_read_in.num_entries = osa_data_read_out.entries_remaining;
+		osa_data_read_in.start_entry = osa_data_read_out.next_entry;
+		
+		ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER, &osa_data_read_in,
+				    sizeof(osa_data_read_in), &osa_data_read_out,
+				    sizeof(osa_data_read_out));
+		//printf("--entries_read--: %d\n", osa_data_read_out.entries_read);
+		//printf("--entries_remaining--: %d\n", osa_data_read_out.entries_remaining);
+		//printf("Entries:\n");
+		int curr_idx = 0;
+		uint64_t osa_info = 0;
+		printf("IDX |\t DATA\n");
+		for (int i = 0; i < osa_data_read_out.entries_read; i++)
+		{
+			printf("-- %d --\n", i);
+			curr_idx = (i * 6);
+			for (int j = 0; j < 6; j++)
+			{
+				if (j >= 0 && j <= 3)
+					printf("0x%08x ", osa_data_read_out.entry_dwords[curr_idx]);
+				else if (j == 4) {
+					osa_info = 
+					((uint64_t)osa_data_read_out.entry_dwords[curr_idx] << 32) 
+					| osa_data_read_out.entry_dwords[curr_idx + 1];
+					printf("\nosa_info: %016lx\n", osa_info);
+					printf("link rate: %d\n", osa_info >> 61);
+					printf("counter: %d\n", osa_info >> 45);
+					printf("timestamp: 0x%08x\n", osa_info >> 27);
+				}
+				curr_idx++;
+			}
+			printf("\n");
+		}
+	}
+	
+	return ret;
+}
+
 int switchtec_osa_capture_control(struct switchtec_dev * dev, int stack_id, int lane_mask,
 					int direction, int drop_single_os, int stop_mode,
 					int snapshot_mode, int post_trigger, int os_types)

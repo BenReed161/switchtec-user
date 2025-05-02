@@ -2346,6 +2346,32 @@ static int osa_dump_config(int argc, char **argv)
 	return 0;
 }
 
+#define CMD_ORDERED_SET_ANALYZER_DUMP_DATA "dump osa data"
+
+static int osa_dump_data(int argc, char **argv)
+{
+	static struct {
+		struct switchtec_dev *dev;
+		int stack_id;
+		int lane;
+		int direction;
+	} cfg;
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
+		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		{"lane", 'l', "lane", CFG_INT, &cfg.lane, 
+		required_argument,"lane ID"},
+		{"direction", 'd', "0/1", CFG_INT, &cfg.direction, 
+		required_argument,"direction tx: 0 rx: 1"},
+		{NULL}};
+
+	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, sizeof(cfg));
+
+	switchtec_osa_capture_data(cfg.dev, cfg.stack_id, cfg.lane, cfg.direction);
+	return 0;
+}
+
 static const struct cmd commands[] = {
 	CMD(crosshair,		CMD_DESC_CROSS_HAIR),
 	CMD(eye,		CMD_DESC_EYE),
@@ -2366,6 +2392,7 @@ static const struct cmd commands[] = {
 	CMD(osa_config_misc,	CMD_ORDERED_SET_ANALYZER_MISC_CONF),
 	CMD(osa_capture_contol, CMD_ORDERED_SET_ANALYZER_CAP_CTRL),
 	CMD(osa_dump_config,	CMD_ORDERED_SET_ANALYZER_DUMP_CONF),
+	CMD(osa_dump_data,	CMD_ORDERED_SET_ANALYZER_DUMP_DATA),
 	{}
 };
 
