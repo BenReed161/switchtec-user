@@ -2124,6 +2124,7 @@ static int tlp_inject (int argc, char **argv)
 
 static int osa(int argc, char **argv)
 {
+	int ret = 0;
 	static struct {
 		struct switchtec_dev *dev;
 		int stack_id;
@@ -2133,13 +2134,22 @@ static int osa(int argc, char **argv)
 		DEVICE_OPTION,
 		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
 		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
-		{"operation", 'o', "0/1/2/3", CFG_INT, &cfg.operation, 
-		required_argument,"operations:\n- stop:0\n- start:1\n- trigger:2\n- reset:3"},
+		{"operation", 'o', "0/1/2/3/4/5", CFG_INT, &cfg.operation, 
+		required_argument,"operations:\n- stop:0\n- start:1\n- trigger:2\n- reset:3\n- release:4\n- status:5"},
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, sizeof(cfg));
+	if (cfg.operation > 5 || cfg.operation < 0) {
+		printf("Invalid operation!\n");
+		switchtec_perror("osa");
+		return -1;
+	}
 
-	switchtec_osa(cfg.dev, cfg.stack_id, cfg.operation);
+	ret = switchtec_osa(cfg.dev, cfg.stack_id, cfg.operation);
+	if (ret) {
+		switchtec_perror("osa");
+		return -1;
+	}
 	return 0;
 }
 
@@ -2147,6 +2157,7 @@ static int osa(int argc, char **argv)
 
 static int osa_config_type(int argc, char **argv)
 {
+	int ret = 0;
 	static struct {
 		struct switchtec_dev *dev;
 		int stack_id;
@@ -2163,17 +2174,20 @@ static int osa_config_type(int argc, char **argv)
 		required_argument,"lane ID"},
 		{"direction", 'd', "0/1", CFG_INT, &cfg.direction, 
 		required_argument,"direction tx: 0 rx: 1"},
-		{"link_rate", 'r', "LANE_MASK", CFG_INT, &cfg.link_rate, 
+		{"link_rate", 'r', "LINK_RATE", CFG_INT, &cfg.link_rate, 
 		required_argument,"lane ID"},
-		{"os_types", 't', "LANE_MASK", CFG_INT, &cfg.os_types, 
+		{"os_types", 't', "OS_TYPES", CFG_INT, &cfg.os_types, 
 		required_argument,"lane ID"},
 		{NULL}};
 	
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_CONF, opts, &cfg, sizeof(cfg));
 
-	switchtec_osa_config_type(cfg.dev, cfg.stack_id, cfg.direction, cfg.lane_mask,
+	ret = switchtec_osa_config_type(cfg.dev, cfg.stack_id, cfg.direction, cfg.lane_mask,
 					cfg.link_rate, cfg.os_types);
-
+	if (ret) {
+		switchtec_perror("osa_config_type");
+		return -1;
+	}
 	return 0;
 }
 
@@ -2203,14 +2217,14 @@ static int osa_config_pat(int argc, char **argv)
 		required_argument,"direction tx: 0 rx: 1"},
 		{"lane_mask", 'l', "LANE_MASK", CFG_NONNEGATIVE, &cfg.lane_mask, 
 		required_argument,"lane ID"},
-		{"link_rate", 'r', "LANE_MASK", CFG_NONNEGATIVE, &cfg.link_rate, 
+		{"link_rate", 'r', "LINK_RATE", CFG_NONNEGATIVE, &cfg.link_rate, 
 		required_argument,"lane ID"},
 		{"dwords", 'v', "\"val_dword0 val_dword1 etc.\"", CFG_STRING, 
 		&cfg.value_dwords, required_argument, 
-		"(Maximum 4 DWs)"},
+		"(Maximum 4 DWs) Dwords should be surrounded by quotations, each dword must begine with \"0x\" and each dword must have a space between them."},
 		{"dwords", 'm', "\"val_dword0 val_dword1 etc.\"", CFG_STRING, 
 		&cfg.mask_dwords, required_argument, 
-		"(Maximum 4 DWs)"},
+		"(Maximum 4 DWs) Dwords should be surrounded by quotations, and each dword must begine with \"0x\" and each dword must have a space between them."},
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_CONF, opts, &cfg, sizeof(cfg));
@@ -2239,7 +2253,7 @@ static int osa_config_pat(int argc, char **argv)
 		return -1;
 	}
 	if (total_dwords > 8) {
-		fprintf(stderr, "Data cannot exceed 8 dwords \n");
+		fprintf(stderr, "Total data (values + mask) cannot exceed 8 dwords \n");
 		free(value_dwords_arr);
 		free(mask_dwords_arr);
 		return -1;
@@ -2248,7 +2262,10 @@ static int osa_config_pat(int argc, char **argv)
 	ret = switchtec_osa_config_pattern(cfg.dev, cfg.stack_id, cfg.direction,
 					   cfg.lane_mask, cfg.link_rate, value_dwords_arr, 
 					   mask_dwords_arr);
-
+	if (ret) {
+		switchtec_perror("osa_config_pat");
+		return -1;
+	}
 	return 0;
 }
 
@@ -2256,6 +2273,7 @@ static int osa_config_pat(int argc, char **argv)
 
 static int osa_config_misc(int argc, char **argv)
 {
+	int ret = 0;
 	static struct {
 		struct switchtec_dev *dev;
 		int stack_id;
@@ -2271,8 +2289,11 @@ static int osa_config_misc(int argc, char **argv)
 	
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_MISC_CONF, opts, &cfg, sizeof(cfg));
 
-	switchtec_osa_config_misc(cfg.dev, cfg.stack_id, cfg.trigger_en);
-
+	ret = switchtec_osa_config_misc(cfg.dev, cfg.stack_id, cfg.trigger_en);
+	if (ret) {
+		switchtec_perror("osa_config_misc");
+		return -1;
+	}
 	return 0;
 }
 
@@ -2280,6 +2301,7 @@ static int osa_config_misc(int argc, char **argv)
 
 static int osa_capture_contol(int argc, char **argv)
 {
+	int ret = 0;
 	static struct {
 		struct switchtec_dev *dev;
 		int stack_id;
@@ -2299,24 +2321,27 @@ static int osa_capture_contol(int argc, char **argv)
 		required_argument},
 		{"direction", 'd', "0/1", CFG_INT, &cfg.direction, 
 		required_argument},
-		{"drop_single_os", 'o', "drop_single_os", CFG_INT, &cfg.drop_single_os, 
+		{"drop_single_os", 'o', "DROP_SINGLE_OS", CFG_INT, &cfg.drop_single_os, 
 		required_argument},
-		{"stop_mode", 'e', "stop_mode", CFG_INT, &cfg.stop_mode, 
+		{"stop_mode", 'S', "STOP_MODE", CFG_INT, &cfg.stop_mode, 
 		required_argument},
-		{"snapshot_mode", 'n', "snapshot_mode", CFG_INT, &cfg.snapshot_mode, 
+		{"snapshot_mode", 's', "SNAPSHOT_MODE", CFG_INT, &cfg.snapshot_mode, 
 		required_argument},
-		{"post_trig_entries", 'p', "post_trig_entries", CFG_INT, &cfg.post_trig_entries, 
+		{"post_trig_entries", 'p', "POST_TRIG_ENTRIES", CFG_INT, &cfg.post_trig_entries, 
 		required_argument},
-		{"os_types", 't', "os_types", CFG_INT, &cfg.os_types, 
+		{"os_types", 't', "OS_TYPES", CFG_INT, &cfg.os_types, 
 		required_argument},
 		{NULL}};
 	
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_CAP_CTRL, opts, &cfg, sizeof(cfg));
 
-	switchtec_osa_capture_control(cfg.dev, cfg.stack_id, cfg.lane_mask, cfg.direction,
+	ret = switchtec_osa_capture_control(cfg.dev, cfg.stack_id, cfg.lane_mask, cfg.direction,
 				cfg.drop_single_os, cfg.stop_mode, cfg.snapshot_mode,
 				cfg.post_trig_entries, cfg.os_types);
-
+	if (ret) {
+		switchtec_perror("osa_capture_control");
+		return -1;
+	}
 	return 0;
 }
 
@@ -2324,6 +2349,7 @@ static int osa_capture_contol(int argc, char **argv)
 
 static int osa_dump_config(int argc, char **argv)
 {
+	int ret = 0;
 	static struct {
 		struct switchtec_dev *dev;
 		int stack_id;
@@ -2334,15 +2360,15 @@ static int osa_dump_config(int argc, char **argv)
 		DEVICE_OPTION,
 		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
 		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
-		{"land_id", 's', "LANE_ID", CFG_INT, &cfg.lane_id, 
-		required_argument,"lane ID"},
-		{"direction", 'd', "0/1", CFG_INT, &cfg.direction, 
-		required_argument,"direction tx: 0 rx: 1"},
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, sizeof(cfg));
 
-	switchtec_osa_dump_conf(cfg.dev, cfg.stack_id);
+	ret = switchtec_osa_dump_conf(cfg.dev, cfg.stack_id);
+	if (ret) {
+		switchtec_perror("osa_dump_config");
+		return -1;
+	}
 	return 0;
 }
 
@@ -2350,6 +2376,7 @@ static int osa_dump_config(int argc, char **argv)
 
 static int osa_dump_data(int argc, char **argv)
 {
+	int ret = 0;
 	static struct {
 		struct switchtec_dev *dev;
 		int stack_id;
@@ -2367,8 +2394,12 @@ static int osa_dump_data(int argc, char **argv)
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, sizeof(cfg));
-
-	switchtec_osa_capture_data(cfg.dev, cfg.stack_id, cfg.lane, cfg.direction);
+	
+	ret = switchtec_osa_capture_data(cfg.dev, cfg.stack_id, cfg.lane, cfg.direction);
+	if (ret) {
+		switchtec_perror("osa_dump_data");
+		return -1;
+	}
 	return 0;
 }
 

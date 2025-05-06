@@ -1236,6 +1236,17 @@ int switchtec_tlp_inject(struct switchtec_dev * dev, int port_id, int tlp_type,
 	return ret;
 }
 
+static void switchtec_osa_dword_data_helper(const uint32_t dwords[4], char *buffer) {
+	char *ptr = buffer;
+	for (int i = 3; i >= 0; --i) {
+		int tmp = sprintf(ptr, "0x%08X", dwords[i]);
+		ptr += tmp;
+		*ptr = ' ';
+		ptr++;
+	}
+	*ptr = '\0';
+}
+
 int switchtec_osa_capture_data(struct switchtec_dev * dev, int stack_id, int lane,
 				int direction)
 {
@@ -1335,28 +1346,33 @@ int switchtec_osa_capture_data(struct switchtec_dev * dev, int stack_id, int lan
 		ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER, &osa_data_read_in,
 				    sizeof(osa_data_read_in), &osa_data_read_out,
 				    sizeof(osa_data_read_out));
-		//printf("--entries_read--: %d\n", osa_data_read_out.entries_read);
-		//printf("--entries_remaining--: %d\n", osa_data_read_out.entries_remaining);
-		//printf("Entries:\n");
+		
 		int curr_idx = 0;
 		uint64_t osa_info = 0;
-		printf("IDX |\t DATA\n");
+		char data_string[45];
+		uint32_t osa_dword_data[4];
+		
+		printf("IDX|TIMESTAMP|CNT|RATE|DRP|TRIG|DATA\n");
 		for (int i = 0; i < osa_data_read_out.entries_read; i++)
 		{
-			printf("-- %d --\n", i);
+			printf("%d\t", i);
 			curr_idx = (i * 6);
 			for (int j = 0; j < 6; j++)
 			{
-				if (j >= 0 && j <= 3)
-					printf("0x%08x ", osa_data_read_out.entry_dwords[curr_idx]);
+				if (j >= 0 && j <= 3) {
+					osa_dword_data[j] = osa_data_read_out.entry_dwords[curr_idx];
+				}
 				else if (j == 4) {
+					switchtec_osa_dword_data_helper(osa_dword_data, data_string);
 					osa_info = 
 					((uint64_t)osa_data_read_out.entry_dwords[curr_idx] << 32) 
 					| osa_data_read_out.entry_dwords[curr_idx + 1];
-					printf("\nosa_info: %016lx\n", osa_info);
-					printf("link rate: %d\n", osa_info >> 61);
-					printf("counter: %d\n", osa_info >> 45);
-					printf("timestamp: 0x%08x\n", osa_info >> 27);
+					printf("0x%08lx\t", (osa_info >> 5) & 0x1fffffffff); //timestamp
+					printf("%ld\t", (osa_info >> 42) & 0x7ffff); // count
+					printf("%ld\t", (osa_info >> 61) & 0x7); // rate
+					printf("%ld\t", (osa_info >> 4) & 0x1); // drop
+					printf("%ld\t", (osa_info >> 3) & 0x1); //trigger
+					printf("%s\n", data_string);
 				}
 				curr_idx++;
 			}
@@ -1437,10 +1453,10 @@ int switchtec_osa_config_pattern(struct switchtec_dev * dev, int stack_id,
 	osa_pattern_config_in.pat_val_dword1 = value_data[1];
 	osa_pattern_config_in.pat_val_dword2 = value_data[2];
 	osa_pattern_config_in.pat_val_dword3 = value_data[3];
-	osa_pattern_config_in.pat_mask_dword0 = mask_data[4];
-	osa_pattern_config_in.pat_mask_dword1 = mask_data[5];
-	osa_pattern_config_in.pat_mask_dword2 = mask_data[6];
-	osa_pattern_config_in.pat_mask_dword3 = mask_data[7];
+	osa_pattern_config_in.pat_mask_dword0 = mask_data[0];
+	osa_pattern_config_in.pat_mask_dword1 = mask_data[1];
+	osa_pattern_config_in.pat_mask_dword2 = mask_data[2];
+	osa_pattern_config_in.pat_mask_dword3 = mask_data[3];
 
 	ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER, &osa_pattern_config_in,
 			sizeof(osa_pattern_config_in), NULL, 0);
@@ -1560,6 +1576,26 @@ int switchtec_osa_dump_conf(struct switchtec_dev * dev, int stack_id)
 int switchtec_osa(struct switchtec_dev * dev, int stack_id, int operation)
 {
 	int ret = 0;
+	struct {
+		uint8_t sub_cmd; //subcommand 8
+		uint8_t stack_id;
+		uint16_t reserved;
+	} osa_rel_access_perm_in; 
+
+	struct {
+		uint8_t sub_cmd; //subcommand 6
+		uint8_t stack_id;
+		uint16_t reserved;
+	} osa_status_query_in;
+
+	struct {
+		uint8_t state;
+		uint8_t trigger_lane;
+		uint8_t trigger_dir;
+		uint8_t reserved;
+		uint16_t trigger_reason;
+		uint16_t reserved2;
+	} osa_status_query_out;
 
 	struct {
 		uint8_t sub_cmd; //subcommand 5
@@ -1568,15 +1604,45 @@ int switchtec_osa(struct switchtec_dev * dev, int stack_id, int operation)
 		uint8_t reserved;
 	} osa_op_in;
 
-	osa_op_in.sub_cmd = MRPC_OSA_ANALYZER_OP;
-	osa_op_in.stack_id = stack_id;
-	osa_op_in.operation = operation;
-
-	char * valid_ops[4] = {"stop", "start", "trigger", "reset"};
+	char * valid_ops[6] = {"stop", "start", "trigger", "reset", "release", "status"};
+	char * states[5] = {"Deactivated (not armed)", "Started (armed), not triggered",
+				"Started (armted), triggered", "Stopped, not triggered",
+				"Stopped, triggered"};
+	char * directions[2] = {"TX", "RX"};
 	printf("Attempting %s operation...\n", valid_ops[operation]);
+	if (operation == 4) {
+		osa_rel_access_perm_in.sub_cmd = MRPC_OSA_REL_ACCESS_PERM;
+		osa_rel_access_perm_in.stack_id = stack_id;
+		
+		ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER, 
+			&osa_rel_access_perm_in, sizeof(osa_rel_access_perm_in), 
+			NULL, 0);
+	}
+	else if (operation == 5) {
+		osa_status_query_in.sub_cmd = MRPC_OSA_STATUS_QUERY;
+		osa_status_query_in.stack_id = stack_id;
 
-	ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER, &osa_op_in, 
-		sizeof(osa_op_in), NULL, 0);
+		ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER, 
+			&osa_status_query_in, sizeof(osa_status_query_in), 
+			&osa_status_query_out, sizeof(osa_status_query_out));
+		if (ret) {
+			switchtec_perror("OSA operation");
+			return ret;
+		}
+		printf("Status of stack %d\n", stack_id);
+		printf("STATE: %s\n", states[osa_status_query_out.state]);
+		printf("TRIGGER_LANE: %d\n", osa_status_query_out.trigger_lane);
+		printf("TRIGGER_DIR: %s\n", directions[osa_status_query_out.trigger_dir]);
+		printf("REASON_BITMASK: %d\n", osa_status_query_out.trigger_reason);
+	}
+	else {
+		osa_op_in.sub_cmd = MRPC_OSA_ANALYZER_OP;
+		osa_op_in.stack_id = stack_id;
+		osa_op_in.operation = operation;
+
+		ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER, &osa_op_in, 
+			sizeof(osa_op_in), NULL, 0);
+	}
 	if (ret) {
 		switchtec_perror("OSA operation");
 		return ret;
