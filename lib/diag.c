@@ -1347,12 +1347,18 @@ int switchtec_osa_capture_data(struct switchtec_dev * dev, int stack_id, int lan
 				    sizeof(osa_data_read_in), &osa_data_read_out,
 				    sizeof(osa_data_read_out));
 		
+		if (ret) {
+			return -1;
+		}
+
 		int curr_idx = 0;
-		uint64_t osa_info = 0;
+		uint32_t timestamp_upper = 0;
+		uint32_t timestamp_lower = 0;
+		uint64_t timestamp = 0;
 		char data_string[45];
 		uint32_t osa_dword_data[4];
 		
-		printf("IDX|TIMESTAMP|CNT|RATE|DRP|TRIG|DATA\n");
+		printf("IDX\tTIMESTAMP\tCNT\tRATE\tDRP\tTRIG\tDATA\n");
 		for (int i = 0; i < osa_data_read_out.entries_read; i++)
 		{
 			printf("%d\t", i);
@@ -1364,15 +1370,17 @@ int switchtec_osa_capture_data(struct switchtec_dev * dev, int stack_id, int lan
 				}
 				else if (j == 4) {
 					switchtec_osa_dword_data_helper(osa_dword_data, data_string);
-					osa_info = 
-					((uint64_t)osa_data_read_out.entry_dwords[curr_idx] << 32) 
-					| osa_data_read_out.entry_dwords[curr_idx + 1];
-					printf("0x%08lx\t", (osa_info >> 5) & 0x1fffffffff); //timestamp
-					printf("%ld\t", (osa_info >> 42) & 0x7ffff); // count
-					printf("%ld\t", (osa_info >> 61) & 0x7); // rate
-					printf("%ld\t", (osa_info >> 4) & 0x1); // drop
-					printf("%ld\t", (osa_info >> 3) & 0x1); //trigger
-					printf("%s\n", data_string);
+					timestamp_lower = (osa_data_read_out.entry_dwords[curr_idx] >> 22) & 0x3FF;
+					timestamp_upper = (osa_data_read_out.entry_dwords[curr_idx+1] & 0x7FFFFFF);
+					printf("time_upper: %d\n", timestamp_upper);
+					printf("time_lower: %d\n", timestamp_lower);
+					timestamp = (uint64_t)timestamp_upper << 12 | timestamp_lower;
+					printf("0x%08lx\t", timestamp); //timestamp
+					printf("%d\t", (osa_data_read_out.entry_dwords[curr_idx] >> 3) & 0x7FFFF); //count
+					printf("%d\t", osa_data_read_out.entry_dwords[curr_idx] & 0x7); //rate
+					printf("%d\t", (osa_data_read_out.entry_dwords[curr_idx+1] >> 28) & 0x1); // drop
+					printf("%d\t", (osa_data_read_out.entry_dwords[curr_idx+1] >> 27) & 0x1); //trigger
+					printf("%s\n", data_string); //dword data
 				}
 				curr_idx++;
 			}
