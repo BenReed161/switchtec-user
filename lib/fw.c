@@ -1604,6 +1604,7 @@ switchtec_fw_part_summary(struct switchtec_dev *dev)
 		break;
 	default:
 		errno = EINVAL;
+		free(summary);
 		return NULL;
 	}
 
