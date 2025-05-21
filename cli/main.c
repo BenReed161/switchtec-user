@@ -1799,6 +1799,7 @@ static int print_fw_part_info(struct switchtec_dev *dev)
 	print_fw_part_line("BOOT", sum->boot.active);
 	print_fw_part_line("MAP", sum->map.active);
 	print_fw_part_line("KEY", sum->key.active);
+	print_fw_part_line("RIOT", sum->riot.active);
 	print_fw_part_line("BL2", sum->bl2.active);
 	print_fw_part_line("IMG", sum->img.active);
 	print_fw_part_line("CFG", sum->cfg.active);
@@ -1809,6 +1810,7 @@ static int print_fw_part_info(struct switchtec_dev *dev)
 	printf("Inactive Partitions:\n");
 	print_fw_part_line("MAP", sum->map.inactive);
 	print_fw_part_line("KEY", sum->key.inactive);
+	print_fw_part_line("RIOT", sum->riot.inactive);
 	print_fw_part_line("BL2", sum->bl2.inactive);
 	print_fw_part_line("IMG", sum->img.inactive);
 	print_fw_part_line("CFG", sum->cfg.inactive);
