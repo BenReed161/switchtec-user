@@ -25,6 +25,8 @@
 #ifndef LIBSWITCHTEC_DIAG_H
 #define LIBSWITCHTEC_DIAG_H
 
+#include "switchtec.h"
+
 #include <stdint.h>
 
 /**
@@ -284,7 +286,7 @@ struct switchtec_tlp_inject_in {
 	uint32_t tlp_type;
 	uint32_t tlp_length;
 	uint32_t ecrc;
-	uint32_t raw_tlp_data[132];
+	uint32_t raw_tlp_data[SWITCHTEC_DIAG_MAX_TLP_DWORDS];
 };
 
 struct osa_type_config_in{

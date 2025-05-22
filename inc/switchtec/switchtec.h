@@ -66,6 +66,8 @@ struct switchtec_dev;
 #define SWITCHTEC_PAX_ID_MASK 0x1f
 #define SWITCHTEC_PAX_ID_LOCAL SWITCHTEC_PAX_ID_MASK
 
+#define SWITCHTEC_DIAG_MAX_TLP_DWORDS 132
+
 #ifdef __CHECKER__
 #define __gas __attribute__((noderef, address_space(1)))
 #else

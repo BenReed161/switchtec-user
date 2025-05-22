@@ -2030,13 +2030,21 @@ static int convert_str_to_dwords(char *str, uint32_t **dwords, int *num_dwords)
 {
 	*num_dwords = 0;
 	const char *ptr = str;
+	int dword_len = 0;
 	while (*ptr != '\0') {
 		if (*ptr == '0' && *(ptr + 1) == 'x') {
 			(*num_dwords)++;
 			ptr += 2;
+			dword_len = 0;
 		}
-		while (*ptr != ' ' && *ptr != '\0')
+		while (*ptr != ' ' && *ptr != '\0') {
 			ptr++;
+			dword_len++;
+		}
+		if (dword_len > 8) {
+			printf("Entered dword longer than allowed\n");
+			return -1;
+		}
 		if (*ptr == ' ')
 			ptr++;
 	}
@@ -2088,7 +2096,7 @@ static int tlp_inject (int argc, char **argv)
 			"Enable the ecrc to be included at the end of the input data (Default: disabled)"},
 		{"tlp_data", 'd', "\"DW0 DW1 ... DW131\"", CFG_STRING, 
 			&cfg.raw_tlp_data, required_argument, 
-			"DWs to be sent as part of the raw TLP (Maximum 132 DWs)"},
+			"DWs to be sent as part of the raw TLP (Maximum 132 DWs). Every DW must start with \'0x\'"},
 		{NULL}
 	};
 
@@ -2104,8 +2112,9 @@ static int tlp_inject (int argc, char **argv)
 		fprintf(stderr, "Error with tlp data provided \n");
 		return -1;
 	}
-	if (num_dwords > 132) {
-		fprintf(stderr, "TLP data cannot exceed 132 dwords \n");
+	if (num_dwords > SWITCHTEC_DIAG_MAX_TLP_DWORDS) {
+		fprintf(stderr, "TLP data cannot exceed %d dwords \n", 
+			SWITCHTEC_DIAG_MAX_TLP_DWORDS);
 		free(raw_tlp_dwords);
 		return -1;
 	}
