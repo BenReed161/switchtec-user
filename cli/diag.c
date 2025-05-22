@@ -2161,26 +2161,31 @@ static int osa_config_type(int argc, char **argv)
 	static struct {
 		struct switchtec_dev *dev;
 		int stack_id;
-		int lane_mask;
-		int direction;
-		int link_rate;
-		int os_types;
+		char * lane_mask;
+		char * direction;
+		char * link_rate;
+		char * os_types;
 	} cfg;
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
 		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
 		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
-		{"lane_mask", 'm', "LANE_MASK", CFG_INT, &cfg.lane_mask, 
-		required_argument,"lane ID"},
-		{"direction", 'd', "0/1", CFG_INT, &cfg.direction, 
-		required_argument,"direction tx: 0 rx: 1"},
-		{"link_rate", 'r', "LINK_RATE", CFG_INT, &cfg.link_rate, 
-		required_argument,"lane ID"},
-		{"os_types", 't', "OS_TYPES", CFG_INT, &cfg.os_types, 
-		required_argument,"lane ID"},
+		{"lane_mask", 'm', "LANE_MASK", CFG_STRING, &cfg.lane_mask, 
+		required_argument,"16 bit lane mask, 1 enables the triggering for that specified lane. Input as a hexidecimal value prefixed with 0x"},
+		{"direction", 'd', "0/1", CFG_STRING, &cfg.direction, 
+		required_argument,"3 bit mask for the direction, 1 enables the correisponding direction. Input as a hexidecimal value prefixed with 0x\nBit 0 : tx\nBit 1 : rx\nBit 2 : txrx"},
+		{"link_rate", 'r', "LINK_RATE", CFG_STRING, &cfg.link_rate, 
+		required_argument,"5 bit mask for link rate, 1 enables the corrisponding link rate. Input as a hexidecimal value prefixed with 0x\nBit 0 : Gen1\nBit 1 : Gen2\nBit 2 : Gen3\nBit 3 : Gen4\nBit 4 : Gen5"},
+		{"os_types", 't', "OS_TYPES", CFG_STRING, &cfg.os_types, 
+		required_argument,"4 bit mask for OS types, 1 enables the corrisponding OS type. Input as a hexidecimal value prefixed with 0x\nBit 0 : TS1\nBit 1 : TS2\nBit 2 : FTS\nBit 3 : CTL_SKP"},
 		{NULL}};
 	
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_CONF, opts, &cfg, sizeof(cfg));
+
+	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
+		fprintf(stderr, "Invalid stack ID.\n");
+		return -1;
+	}
 
 	ret = switchtec_osa_config_type(cfg.dev, cfg.stack_id, cfg.direction, cfg.lane_mask,
 					cfg.link_rate, cfg.os_types);
