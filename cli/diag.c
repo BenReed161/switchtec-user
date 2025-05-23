@@ -2026,7 +2026,7 @@ static int refclk(int argc, char **argv)
 	return 0;
 }
 
-static int convert_str_to_dwords(char *str, uint32_t **dwords, int *num_dwords, 
+static int convert_hex_str(char *str, uint32_t **dwords, int *num_dwords, 
 				 int dword_len_max)
 {
 	*num_dwords = 0;
@@ -2107,7 +2107,7 @@ static int tlp_inject (int argc, char **argv)
 		fprintf(stderr, "Must set tlp data --tlp_data -d \n");
 		return -1;
 	}
-	ret = convert_str_to_dwords(cfg.raw_tlp_data, &raw_tlp_dwords, 
+	ret = convert_hex_str(cfg.raw_tlp_data, &raw_tlp_dwords, 
 				    &num_dwords, 8);
 	if (ret) {
 		fprintf(stderr, "Error with tlp data provided \n");
@@ -2207,14 +2207,14 @@ static int osa_config_type(int argc, char **argv)
 	}
 
 	if (cfg.lane_mask) {
-		ret = convert_str_to_dwords(cfg.lane_mask, &lane_mask, &num_dwords, 4);
+		ret = convert_hex_str(cfg.lane_mask, &lane_mask, &num_dwords, 4);
 		if (ret) {
 			fprintf(stderr, "Error with lane mask.\n");
 			return -1;
 		}
 	}
 	if (cfg.direction) {
-		ret = convert_str_to_dwords(cfg.direction, &direction_mask, &num_dwords, 1);
+		ret = convert_hex_str(cfg.direction, &direction_mask, &num_dwords, 1);
 		if (ret) {
 			fprintf(stderr, "Error with direction mask.\n");
 			return -1;
@@ -2227,7 +2227,7 @@ static int osa_config_type(int argc, char **argv)
 		}
 	}
 	if (cfg.link_rate) {
-		ret = convert_str_to_dwords(cfg.link_rate, &link_rate_mask, &num_dwords, 2);
+		ret = convert_hex_str(cfg.link_rate, &link_rate_mask, &num_dwords, 2);
 		if (ret) {
 			fprintf(stderr, "Error with link rate mask.\n");
 			return -1;
@@ -2241,7 +2241,7 @@ static int osa_config_type(int argc, char **argv)
 		}
 	}
 	if (cfg.os_types) {
-		ret = convert_str_to_dwords(cfg.os_types, &os_type_mask, &num_dwords, 1);
+		ret = convert_hex_str(cfg.os_types, &os_type_mask, &num_dwords, 1);
 		if (ret) {
 			fprintf(stderr, "Error with OS type mask.\n");
 			free(lane_mask);
@@ -2315,14 +2315,14 @@ static int osa_config_pat(int argc, char **argv)
 	}
 
 	if (cfg.lane_mask) {
-		ret = convert_str_to_dwords(cfg.lane_mask, &lane_mask, &num_dwords, 4);
+		ret = convert_hex_str(cfg.lane_mask, &lane_mask, &num_dwords, 4);
 		if (ret) {
 			fprintf(stderr, "Error with lane mask.\n");
 			return -1;
 		}
 	}
 	if (cfg.direction) {
-		ret = convert_str_to_dwords(cfg.direction, &direction_mask, &num_dwords, 1);
+		ret = convert_hex_str(cfg.direction, &direction_mask, &num_dwords, 1);
 		if (ret) {
 			fprintf(stderr, "Error with direction mask.\n");
 			return -1;
@@ -2335,7 +2335,7 @@ static int osa_config_pat(int argc, char **argv)
 		}
 	}
 	if (cfg.link_rate) {
-		ret = convert_str_to_dwords(cfg.link_rate, &link_rate_mask, &num_dwords, 2);
+		ret = convert_hex_str(cfg.link_rate, &link_rate_mask, &num_dwords, 2);
 		if (ret) {
 			fprintf(stderr, "Error with link rate mask.\n");
 			return -1;
@@ -2357,7 +2357,7 @@ static int osa_config_pat(int argc, char **argv)
 		fprintf(stderr, "Must set mask dword data --dwords_mask -M \n");
 		return -1;
 	}
-	ret = convert_str_to_dwords(cfg.value_dwords, &value_dwords_arr, 
+	ret = convert_hex_str(cfg.value_dwords, &value_dwords_arr, 
 				    &num_dwords, 8);
 	if (ret) {
 		fprintf(stderr, "Error with data provided \n");
@@ -2365,7 +2365,7 @@ static int osa_config_pat(int argc, char **argv)
 	}
 	total_dwords += num_dwords;
 	num_dwords = 0;
-	ret = convert_str_to_dwords(cfg.mask_dwords, &mask_dwords_arr, 
+	ret = convert_hex_str(cfg.mask_dwords, &mask_dwords_arr, 
 				    &num_dwords, 8);
 	total_dwords += num_dwords;
 	if (ret) {
