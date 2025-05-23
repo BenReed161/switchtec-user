@@ -2026,7 +2026,8 @@ static int refclk(int argc, char **argv)
 	return 0;
 }
 
-static int convert_str_to_dwords(char *str, uint32_t **dwords, int *num_dwords)
+static int convert_str_to_dwords(char *str, uint32_t **dwords, int *num_dwords, 
+				 int dword_len_max)
 {
 	*num_dwords = 0;
 	const char *ptr = str;
@@ -2041,7 +2042,7 @@ static int convert_str_to_dwords(char *str, uint32_t **dwords, int *num_dwords)
 			ptr++;
 			dword_len++;
 		}
-		if (dword_len > 8) {
+		if (dword_len > dword_len_max) {
 			printf("Entered dword longer than allowed\n");
 			return -1;
 		}
