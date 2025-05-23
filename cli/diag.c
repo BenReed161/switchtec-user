@@ -2108,7 +2108,7 @@ static int tlp_inject (int argc, char **argv)
 		return -1;
 	}
 	ret = convert_str_to_dwords(cfg.raw_tlp_data, &raw_tlp_dwords, 
-				    &num_dwords);
+				    &num_dwords, 8);
 	if (ret) {
 		fprintf(stderr, "Error with tlp data provided \n");
 		return -1;
@@ -2149,15 +2149,19 @@ static int osa(int argc, char **argv)
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, sizeof(cfg));
+
+	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
+		fprintf(stderr, "Invalid stack ID.\n");
+		return -1;
+	}
+
 	if (cfg.operation > 5 || cfg.operation < 0) {
 		printf("Invalid operation!\n");
-		switchtec_perror("osa");
 		return -1;
 	}
 
 	ret = switchtec_osa(cfg.dev, cfg.stack_id, cfg.operation);
 	if (ret) {
-		switchtec_perror("osa");
 		return -1;
 	}
 	return 0;
@@ -2168,6 +2172,11 @@ static int osa(int argc, char **argv)
 static int osa_config_type(int argc, char **argv)
 {
 	int ret = 0;
+	uint32_t * lane_mask = NULL;
+	uint32_t * direction_mask = NULL;
+	uint32_t * link_rate_mask = NULL;
+	uint32_t * os_type_mask = NULL;
+	int num_dwords = 0;
 	static struct {
 		struct switchtec_dev *dev;
 		int stack_id;
@@ -2197,8 +2206,61 @@ static int osa_config_type(int argc, char **argv)
 		return -1;
 	}
 
-	ret = switchtec_osa_config_type(cfg.dev, cfg.stack_id, cfg.direction, cfg.lane_mask,
-					cfg.link_rate, cfg.os_types);
+	if (cfg.lane_mask) {
+		ret = convert_str_to_dwords(cfg.lane_mask, &lane_mask, &num_dwords, 4);
+		if (ret) {
+			fprintf(stderr, "Error with lane mask.\n");
+			return -1;
+		}
+	}
+	if (cfg.direction) {
+		ret = convert_str_to_dwords(cfg.direction, &direction_mask, &num_dwords, 1);
+		if (ret) {
+			fprintf(stderr, "Error with direction mask.\n");
+			return -1;
+		}
+		if (*direction_mask > 3) {
+			fprintf(stderr, "Direction mask cannot be greater than 0x3.\n");
+			free(lane_mask);
+			free(direction_mask);
+			return -1;
+		}
+	}
+	if (cfg.link_rate) {
+		ret = convert_str_to_dwords(cfg.link_rate, &link_rate_mask, &num_dwords, 2);
+		if (ret) {
+			fprintf(stderr, "Error with link rate mask.\n");
+			return -1;
+		}
+		if (*link_rate_mask > 31) {
+			fprintf(stderr, "Link rate cannot be greater than 0x1F.\n");
+			free(lane_mask);
+			free(direction_mask);
+			free(link_rate_mask);
+			return -1;
+		}
+	}
+	if (cfg.os_types) {
+		ret = convert_str_to_dwords(cfg.os_types, &os_type_mask, &num_dwords, 1);
+		if (ret) {
+			fprintf(stderr, "Error with OS type mask.\n");
+			free(lane_mask);
+			free(direction_mask);
+			free(link_rate_mask);
+			return -1;
+		}
+	}
+
+	ret = switchtec_osa_config_type(cfg.dev, cfg.stack_id, 
+				direction_mask != NULL ? *direction_mask : 0, 
+				lane_mask != NULL ? *lane_mask : 0, 
+				link_rate_mask != NULL ? *link_rate_mask : 0, 
+				os_type_mask != NULL ? *os_type_mask : 0);
+	free(lane_mask);
+	free(direction_mask);
+	free(link_rate_mask);
+	free(os_type_mask);
+
 	if (ret) {
 		switchtec_perror("osa_config_type");
 		return -1;
@@ -2213,14 +2275,17 @@ static int osa_config_pat(int argc, char **argv)
 	int ret = 0;
 	uint32_t * value_dwords_arr = NULL;
 	uint32_t * mask_dwords_arr = NULL;
+	uint32_t * lane_mask = NULL;
+	uint32_t * direction_mask = NULL;
+	uint32_t * link_rate_mask = NULL;
 	int num_dwords = 0;
 	int total_dwords = 0;
 	static struct {
 		struct switchtec_dev *dev;
 		int stack_id;
-		int direction;
-		int lane_mask;
-		int link_rate;
+		char * direction;
+		char * lane_mask;
+		char * link_rate;
 		char * value_dwords;
 		char * mask_dwords;
 	} cfg;
@@ -2228,32 +2293,72 @@ static int osa_config_pat(int argc, char **argv)
 		DEVICE_OPTION,
 		{"stack_id", 's', "STACK_ID", CFG_NONNEGATIVE, &cfg.stack_id, 
 		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
-		{"direction", 'd', "0/1", CFG_NONNEGATIVE, &cfg.direction, 
-		required_argument,"direction tx: 0 rx: 1"},
-		{"lane_mask", 'l', "LANE_MASK", CFG_NONNEGATIVE, &cfg.lane_mask, 
-		required_argument,"lane ID"},
-		{"link_rate", 'r', "LINK_RATE", CFG_NONNEGATIVE, &cfg.link_rate, 
-		required_argument,"lane ID"},
-		{"dwords", 'v', "\"val_dword0 val_dword1 etc.\"", CFG_STRING, 
+		{"lane_mask", 'm', "LANE_MASK", CFG_STRING, &cfg.lane_mask, 
+		required_argument,"16 bit lane mask, 1 enables the triggering for that specified lane. Input as a hexidecimal value prefixed with 0x"},
+		{"direction", 'd', "0/1", CFG_STRING, &cfg.direction, 
+		required_argument,"3 bit mask for the direction, 1 enables the correisponding direction. Input as a hexidecimal value prefixed with 0x\nBit 0 : tx\nBit 1 : rx\nBit 2 : txrx"},
+		{"link_rate", 'r', "LINK_RATE", CFG_STRING, &cfg.link_rate, 
+		required_argument,"5 bit mask for link rate, 1 enables the corrisponding link rate. Input as a hexidecimal value prefixed with 0x\nBit 0 : Gen1\nBit 1 : Gen2\nBit 2 : Gen3\nBit 3 : Gen4\nBit 4 : Gen5"},
+		{"dwords_value", 'V', "\"val_dword0 val_dword1 etc.\"", CFG_STRING, 
 		&cfg.value_dwords, required_argument, 
 		"(Maximum 4 DWs) Dwords should be surrounded by quotations, each dword must begine with \"0x\" and each dword must have a space between them."},
-		{"dwords", 'm', "\"val_dword0 val_dword1 etc.\"", CFG_STRING, 
+		{"dwords_mask", 'M', "\"val_dword0 val_dword1 etc.\"", CFG_STRING, 
 		&cfg.mask_dwords, required_argument, 
 		"(Maximum 4 DWs) Dwords should be surrounded by quotations, and each dword must begine with \"0x\" and each dword must have a space between them."},
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_CONF, opts, &cfg, sizeof(cfg));
+	
+	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
+		fprintf(stderr, "Invalid stack ID.\n");
+		return -1;
+	}
 
+	if (cfg.lane_mask) {
+		ret = convert_str_to_dwords(cfg.lane_mask, &lane_mask, &num_dwords, 4);
+		if (ret) {
+			fprintf(stderr, "Error with lane mask.\n");
+			return -1;
+		}
+	}
+	if (cfg.direction) {
+		ret = convert_str_to_dwords(cfg.direction, &direction_mask, &num_dwords, 1);
+		if (ret) {
+			fprintf(stderr, "Error with direction mask.\n");
+			return -1;
+		}
+		if (*direction_mask > 3) {
+			fprintf(stderr, "Direction mask cannot be greater than 0x3.\n");
+			free(lane_mask);
+			free(direction_mask);
+			return -1;
+		}
+	}
+	if (cfg.link_rate) {
+		ret = convert_str_to_dwords(cfg.link_rate, &link_rate_mask, &num_dwords, 2);
+		if (ret) {
+			fprintf(stderr, "Error with link rate mask.\n");
+			return -1;
+		}
+		if (*link_rate_mask > 31) {
+			fprintf(stderr, "Link rate cannot be greater than 0x1F.\n");
+			free(lane_mask);
+			free(direction_mask);
+			free(link_rate_mask);
+			return -1;
+		}
+	}
+	num_dwords = 0;
 	if (cfg.value_dwords == NULL) {
-		fprintf(stderr, "Must set value dword data --dwords -d \n");
+		fprintf(stderr, "Must set value dword data --dwords_value -V \n");
 		return -1;
 	}
 	if (cfg.mask_dwords == NULL) {
-		fprintf(stderr, "Must set mask dword data --dwords -d \n");
+		fprintf(stderr, "Must set mask dword data --dwords_mask -M \n");
 		return -1;
 	}
 	ret = convert_str_to_dwords(cfg.value_dwords, &value_dwords_arr, 
-				    &num_dwords);
+				    &num_dwords, 8);
 	if (ret) {
 		fprintf(stderr, "Error with data provided \n");
 		return -1;
@@ -2261,7 +2366,7 @@ static int osa_config_pat(int argc, char **argv)
 	total_dwords += num_dwords;
 	num_dwords = 0;
 	ret = convert_str_to_dwords(cfg.mask_dwords, &mask_dwords_arr, 
-				    &num_dwords);
+				    &num_dwords, 8);
 	total_dwords += num_dwords;
 	if (ret) {
 		fprintf(stderr, "Error with data provided \n");
@@ -2274,9 +2379,16 @@ static int osa_config_pat(int argc, char **argv)
 		return -1;
 	}
 
-	ret = switchtec_osa_config_pattern(cfg.dev, cfg.stack_id, cfg.direction,
-					   cfg.lane_mask, cfg.link_rate, value_dwords_arr, 
-					   mask_dwords_arr);
+	ret = switchtec_osa_config_pattern(cfg.dev, cfg.stack_id, 
+				direction_mask != NULL ? *direction_mask : 0, 
+				lane_mask != NULL ? *lane_mask : 0, 
+				link_rate_mask != NULL ? *link_rate_mask : 0, 
+				value_dwords_arr, mask_dwords_arr);
+	free(lane_mask);
+	free(direction_mask);
+	free(link_rate_mask);
+	free(value_dwords_arr);
+	free(mask_dwords_arr);
 	if (ret) {
 		switchtec_perror("osa_config_pat");
 		return -1;
