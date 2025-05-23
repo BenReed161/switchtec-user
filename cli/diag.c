@@ -2190,13 +2190,13 @@ static int osa_config_type(int argc, char **argv)
 		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
 		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
 		{"lane_mask", 'm', "LANE_MASK", CFG_STRING, &cfg.lane_mask, 
-		optional_argument,"16 bit lane mask, 1 enables the triggering for that specified lane. (If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x"},
+		required_argument,"16 bit lane mask, 1 enables the triggering for that specified lane. (If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x"},
 		{"direction", 'd', "DIRECTION", CFG_STRING, &cfg.direction, 
-		optional_argument,"3 bit mask for the direction, 1 enables the correisponding direction. (If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x\nBit 0 : tx\nBit 1 : rx"},
+		required_argument,"3 bit mask for the direction, 1 enables the correisponding direction. (If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x\nBit 0 : tx\nBit 1 : rx"},
 		{"link_rate", 'r', "LINK_RATE", CFG_STRING, &cfg.link_rate, 
-		optional_argument,"5 bit mask for link rate, 1 enables the corrisponding link rate. (If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x\nBit 0 : Gen1\nBit 1 : Gen2\nBit 2 : Gen3\nBit 3 : Gen4\nBit 4 : Gen5"},
+		required_argument,"5 bit mask for link rate, 1 enables the corrisponding link rate. (If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x\nBit 0 : Gen1\nBit 1 : Gen2\nBit 2 : Gen3\nBit 3 : Gen4\nBit 4 : Gen5"},
 		{"os_types", 't', "OS_TYPES", CFG_STRING, &cfg.os_types, 
-		optional_argument,"4 bit mask for OS types, 1 enables the corrisponding OS type. (If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x\nBit 0 : TS1\nBit 1 : TS2\nBit 2 : FTS\nBit 3 : CTL_SKP"},
+		required_argument,"4 bit mask for OS types, 1 enables the corrisponding OS type. (If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x\nBit 0 : TS1\nBit 1 : TS2\nBit 2 : FTS\nBit 3 : CTL_SKP"},
 		{NULL}};
 	
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_CONF, opts, &cfg, sizeof(cfg));
