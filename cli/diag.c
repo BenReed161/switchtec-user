@@ -2532,7 +2532,6 @@ static const struct cmd commands[] = {
 	CMD(ltssm_log,		CMD_DESC_LTSSM_LOG),
 	CMD(tlp_inject,		CMD_TLP_INJECT),
 	CMD(aer_event_gen,	CMD_DESC_AER_EVENT_GEN),
-	CMD(tlp_inject,		CMD_TLP_INJECT),
 	CMD(linkerr_inject,	CMD_DESC_LNKERR_INJECT),
 	{}
 };
