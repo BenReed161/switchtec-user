@@ -461,7 +461,7 @@ void graph_draw_text_no_invert(struct range *X, struct range *Y,
 	for_range(y, Y) {
 		printf("%5d  ", y);
 		i = 0;
-		for_range(x, X)  {
+		for_range(x, X) {
 			space_ch = ' ';
 			if (data[j * stride + i] == GRAPH_TEXT_HLINE ||
 			    data[j * stride + i] == GRAPH_TEXT_PLUS)

@@ -1323,7 +1323,6 @@ static int switchtec_gen5_diag_eye_read(struct switchtec_dev *dev, int lane_id,
 	return ret;
 }
 
-/*Gen5 eye capture logic*/
 static double *eye_capture_dev_gen5(struct switchtec_dev *dev,
 					int port_id, int lane_id, int num_lanes,
 					int capture_depth, int* num_phases, int* gen)
@@ -1396,8 +1395,8 @@ static double *eye_capture_dev_gen5(struct switchtec_dev *dev,
 				}
 			}
 
-			memcpy(&ber_data[(j * stride) + (bin * num_phases_l)], tmp,
-				   num_phases_l * sizeof(double));
+			memcpy(&ber_data[(j * stride) + (bin * num_phases_l)], 
+			       tmp, num_phases_l * sizeof(double));
 		}
 	}
 
@@ -1607,6 +1606,7 @@ static const struct argconfig_choice loopback_ltssm_speeds[] = {
 	{"GEN3", SWITCHTEC_DIAG_LTSSM_GEN3, "GEN3 LTSSM Speed"},
 	{"GEN4", SWITCHTEC_DIAG_LTSSM_GEN4, "GEN4 LTSSM Speed"},
 	{"GEN5", SWITCHTEC_DIAG_LTSSM_GEN5, "GEN5 LTSSM Speed"},
+	{}
 };
 
 static int print_loopback_mode(struct switchtec_dev *dev, int port_id)
@@ -1741,8 +1741,7 @@ static int loopback(int argc, char **argv)
 			ret = switchtec_diag_loopback_set_gen5(cfg.dev, cfg.port_id,
 				cfg.enable_parallel, cfg.enable_external, 
 				cfg.enable_ltssm, cfg.speed);
-		}
-		else {
+		} else {
 			ret = switchtec_diag_loopback_set(cfg.dev, cfg.port_id,
 				enable, cfg.speed);
 		}
@@ -1993,7 +1992,7 @@ static int port_eq_txcoeff(int argc, char **argv)
 	int i, ret;
 
 	const struct argconfig_options opts[] = {
-		DEVICE_OPTION, FAR_END_OPTION, PORT_OPTION, PREV_OPTION, {NULL}
+		DEVICE_OPTION, FAR_END_OPTION, PORT_OPTION, PREV_OPTION, {}
 	};
 
 	ret = diag_parse_common_cfg(argc, argv, CMD_DESC_PORT_EQ_TXCOEFF,

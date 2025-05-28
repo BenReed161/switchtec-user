@@ -1144,19 +1144,19 @@ struct switchtec_rem_port_eq_coeff {
 };
 
 enum lane_eq_dump_type_enum {
-	LANE_EQ_DUMP_TYPE_CURR,   /**< current settings */
-	LANE_EQ_DUMP_TYPE_PREV,   /**< previous link-up settings */
-	LANE_EQ_DUMP_TYPE_NUM     /**< total number of dump types */
+	LANE_EQ_DUMP_TYPE_CURR,   //!< Current settings
+	LANE_EQ_DUMP_TYPE_PREV,   //!< Previous link-up settings
+	LANE_EQ_DUMP_TYPE_NUM     //!< Total number of dump types
 };
 
 enum link_rate_enum {
-	PCIE_LINK_RATE_INV  = 0,  /**< invalid */
-	PCIE_LINK_RATE_GEN1 = 1,  /**< Gen1, supports 2.5GT/s */
-	PCIE_LINK_RATE_GEN2 = 2,  /**< Gen2, supports 2.5GT/s, 5GT/s */
-	PCIE_LINK_RATE_GEN3 = 3,  /**< Gen3, supports 2.5GT/s, 5GT/s, 8GT/s */
-	PCIE_LINK_RATE_GEN4 = 4,  /**< Gen4, supports 2.5GT/s, 5GT/s, 8GT/s, 16GT/s */
-	PCIE_LINK_RATE_GEN5 = 5,  /**< Gen5, supports 2.5GT/s, 5GT/s, 8GT/s, 16GT/s, 32GT/s */
-	PCIE_LINK_RATE_NUM  = 5   /**< total number of PCIe generations */
+	PCIE_LINK_RATE_INV  = 0,  //!< Invalid
+	PCIE_LINK_RATE_GEN1 = 1,  //!< Gen1, supports 2.5GT/s
+	PCIE_LINK_RATE_GEN2 = 2,  //!< Gen2, supports 2.5GT/s, 5GT/s
+	PCIE_LINK_RATE_GEN3 = 3,  //!< Gen3, supports 2.5GT/s, 5GT/s, 8GT/s
+	PCIE_LINK_RATE_GEN4 = 4,  //!< Gen4, supports 2.5GT/s, 5GT/s, 8GT/s, 16GT/s
+	PCIE_LINK_RATE_GEN5 = 5,  //!< Gen5, supports 2.5GT/s, 5GT/s, 8GT/s, 16GT/s, 32GT/s
+	PCIE_LINK_RATE_NUM  = 5   //!< Total number of PCIe generations
 };
 
 struct switchtec_port_eq_coeff_in {
