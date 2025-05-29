@@ -1791,6 +1791,35 @@ static enum switchtec_gen map_to_gen(uint32_t gen)
 	return ret;
 }
 
+int switchtec_get_device_minor_ver(struct switchtec_dev *dev, char ** res)
+{
+	void __gas * addr;
+	int offset = 0x2004;
+	gasptr_t map;
+	size_t map_size;
+	uint32_t gas_result;
+	char result[10];
+
+	uint8_t minor;
+	uint8_t sub_minor;
+
+	map = switchtec_gas_map(dev, 0, &map_size);
+	if (map == SWITCHTEC_MAP_FAILED) {
+		switchtec_perror("gas_map");
+		return -1;
+	}
+	addr = map;
+	gas_result = __gas_read32(dev, addr + offset);
+	minor = (gas_result >> 0x10) & 0xFF;
+	sub_minor = (gas_result >> 0x18) & 0xFF;
+	snprintf(result, 10, ".%d.%d", minor, sub_minor);
+	*res = result;
+
+	switchtec_gas_unmap(dev, map);
+
+	return 0;
+}
+
 /**
  * @brief Get device generation, revision, and boot phase info
  * @param[in]  dev	Switchtec device handle

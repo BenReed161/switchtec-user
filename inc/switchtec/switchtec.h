@@ -398,6 +398,7 @@ int switchtec_get_device_info(struct switchtec_dev *dev,
 			      enum switchtec_boot_phase *phase,
 			      enum switchtec_gen *gen,
 			      enum switchtec_rev *rev);
+int switchtec_get_device_minor_ver(struct switchtec_dev *dev, char ** res);
 const char *switchtec_strerror(void);
 void switchtec_perror(const char *str);
 int switchtec_log_to_file(struct switchtec_dev *dev,
