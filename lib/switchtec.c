@@ -1798,10 +1798,9 @@ int switchtec_get_device_minor_ver(struct switchtec_dev *dev, char ** res)
 	gasptr_t map;
 	size_t map_size;
 	uint32_t gas_result;
-	char result[10];
+	char result[5];
 
 	uint8_t minor;
-	uint8_t sub_minor;
 
 	map = switchtec_gas_map(dev, 0, &map_size);
 	if (map == SWITCHTEC_MAP_FAILED) {
@@ -1811,8 +1810,7 @@ int switchtec_get_device_minor_ver(struct switchtec_dev *dev, char ** res)
 	addr = map;
 	gas_result = __gas_read32(dev, addr + offset);
 	minor = (gas_result >> 0x10) & 0xFF;
-	sub_minor = (gas_result >> 0x18) & 0xFF;
-	snprintf(result, 10, ".%d.%d", minor, sub_minor);
+	snprintf(result, 5, ".%d", minor);
 	*res = result;
 
 	switchtec_gas_unmap(dev, map);
