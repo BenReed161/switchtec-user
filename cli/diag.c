@@ -160,7 +160,14 @@ static int ltssm_log(int argc, char **argv) {
 		printf("%3d\t", i);
 		printf("%09x\t", output[i].timestamp);
 		printf("%.1fG\t\t", output[i].link_rate);
-		printf("%s\n", switchtec_ltssm_str(output[i].link_state, 1));
+		if (switchtec_is_gen5(cfg.dev))
+			printf("%s\n", 
+				switchtec_ltssm_str_gen5(output[i].link_state, 
+							 1));
+		else
+			printf("%s\n", 
+				switchtec_ltssm_str_gen4(output[i].link_state, 
+							 1));
 	}
 
 	return ret;

@@ -527,9 +527,12 @@ static int topo_info(int argc, char **argv)
 		ltssm = port_info->port_minor_ltssm;
 		ltssm <<= 8;
 		ltssm |= port_info->port_major_ltssm;
-
-		printf("        LTSSM:			        %s\n",
-		       switchtec_ltssm_str(ltssm, 1));
+		if (switchtec_is_gen5(cfg.dev))
+			printf("        LTSSM:			        %s\n",
+			       switchtec_ltssm_str_gen5(ltssm, 1));
+		else
+			printf("        LTSSM:			        %s\n",
+			       switchtec_ltssm_str_gen4(ltssm, 1));	
 		printf("        Clock Channel:			%d\n",
 		       port_info->port_clock_channel);
 		printf("        Connector Index:		%d\n",
