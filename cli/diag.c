@@ -2026,6 +2026,47 @@ static int refclk(int argc, char **argv)
 	return 0;
 }
 
+static int convert_hex_str(char *str, uint32_t **dwords, int *num_dwords, 
+			   int dword_len_max)
+{
+	*num_dwords = 0;
+	const char *ptr = str;
+	int dword_len = 0;
+	while (*ptr != '\0') {
+		if (*ptr == '0' && *(ptr + 1) == 'x') {
+			(*num_dwords)++;
+			ptr += 2;
+			dword_len = 0;
+		}
+		while (*ptr != ' ' && *ptr != '\0') {
+			ptr++;
+			dword_len++;
+		}
+		if (dword_len > dword_len_max) {
+			printf("Entered dword longer than allowed\n");
+			return -1;
+		}
+		if (*ptr == ' ')
+			ptr++;
+	}
+	*dwords = (uint32_t *)malloc(*num_dwords * sizeof(uint32_t));
+	if (*dwords == NULL)
+		return -1;
+	ptr = str;
+	for (int i = 0; i < *num_dwords; i++) {
+		char *endptr;
+		(*dwords)[i] = (uint32_t)strtoul(ptr, &endptr, 0);
+		if (endptr == ptr || (*endptr != ' ' && *endptr != '\0')) {
+			free(*dwords);
+			return -1;
+		}
+		ptr = endptr;
+		while (*ptr == ' ')
+			ptr++;
+	}
+	return 0;
+}
+
 #define CMD_ORDERED_SET_ANALYZER "Ordered set analyzer"
 
 static int osa(int argc, char **argv)
