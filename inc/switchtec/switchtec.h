@@ -50,7 +50,9 @@ struct switchtec_dev;
 
 #define SWITCHTEC_MAX_PARTS  48
 #define SWITCHTEC_MAX_PORTS  60
+#define SWITCHTEC_MAX_PORTS_GEN6 20
 #define SWITCHTEC_MAX_LANES  100
+#define SWITCHTEC_MAX_LANES_GEN6 144
 #define SWITCHTEC_MAX_STACKS 8
 #define SWITCHTEC_PORTS_PER_STACK 8
 #define SWITCHTEC_MAX_EVENT_COUNTERS 64
@@ -92,6 +94,7 @@ enum switchtec_gen {
 	SWITCHTEC_GEN3,
 	SWITCHTEC_GEN4,
 	SWITCHTEC_GEN5,
+	SWITCHTEC_GEN6,
 	SWITCHTEC_GEN_UNKNOWN,
 };
 
@@ -480,12 +483,28 @@ static inline int switchtec_is_gen5(struct switchtec_dev *dev)
 }
 
 /**
+ * @brief Return whether a Switchtec device is a Gen 6 device.
+ */
+static inline int switchtec_is_gen6(struct switchtec_dev *dev)
+{
+	return switchtec_gen(dev) == SWITCHTEC_GEN6;
+}
+
+/**
  * @brief Return the max number of ports of a Switchtec device.
  */
 static inline int switchtec_max_supported_ports(struct switchtec_dev *dev)
 {
-	return switchtec_is_gen5(dev) ? SWITCHTEC_MAX_PORTS :
-	       switchtec_is_gen4(dev) ? 52 : 48;
+	switch(switchtec_gen(dev)) {
+	case SWITCHTEC_GEN6:
+		return SWITCHTEC_MAX_PORTS_GEN6;
+	case SWITCHTEC_GEN5:
+		return SWITCHTEC_MAX_PORTS;
+	case SWITCHTEC_GEN4:
+		return 52;
+	default:
+		return 48;
+	}
 }
 
 /**
@@ -597,7 +616,8 @@ static inline const char *switchtec_gen_str(struct switchtec_dev *dev)
 
 	str =  switchtec_is_gen3(dev) ? "GEN3" :
 	       switchtec_is_gen4(dev) ? "GEN4" :
-	       switchtec_is_gen5(dev) ? "GEN5" : "Unknown";
+	       switchtec_is_gen5(dev) ? "GEN5" :
+	       switchtec_is_gen6(dev) ? "GEN6" : "Unknown";
 
 	return str;
 }
@@ -626,6 +646,7 @@ switchtec_fw_image_gen_str(struct switchtec_fw_image_info *inf)
 	case SWITCHTEC_GEN3: return "GEN3";
 	case SWITCHTEC_GEN4: return "GEN4";
 	case SWITCHTEC_GEN5: return "GEN5";
+	case SWITCHTEC_GEN6: return "GEN6";
 	default:	     return "UNKNOWN";
 	}
 }
@@ -1313,7 +1334,8 @@ enum link_rate_enum {
 	PCIE_LINK_RATE_GEN3 = 3,  //!< Gen3, supports 2.5GT/s, 5GT/s, 8GT/s
 	PCIE_LINK_RATE_GEN4 = 4,  //!< Gen4, supports 2.5GT/s, 5GT/s, 8GT/s, 16GT/s
 	PCIE_LINK_RATE_GEN5 = 5,  //!< Gen5, supports 2.5GT/s, 5GT/s, 8GT/s, 16GT/s, 32GT/s
-	PCIE_LINK_RATE_NUM  = 5   //!< Total number of PCIe generations
+	PCIE_LINK_RATE_GEN6 = 6,  //!< Gen6, supports 2.5GT/s, 5GT/s, 8GT/s, 16GT/s, 32GT/s, 64GT/s
+	PCIE_LINK_RATE_NUM  = 6   //!< Total number of PCIe generations
 };
 
 struct switchtec_port_eq_coeff_in {
