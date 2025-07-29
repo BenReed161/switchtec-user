@@ -469,6 +469,14 @@ static inline int switchtec_is_gen5(struct switchtec_dev *dev)
 }
 
 /**
+ * @brief Return whether a Switchtec device is a Gen 6 device.
+ */
+static inline int switchtec_is_gen6(struct switchtec_dev *dev)
+{
+	return switchtec_gen(dev) == SWITCHTEC_GEN6;
+}
+
+/**
  * @brief Return the max number of ports of a Switchtec device.
  */
 static inline int switchtec_max_supported_ports(struct switchtec_dev *dev)
