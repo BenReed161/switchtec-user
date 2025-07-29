@@ -2449,4 +2449,70 @@ int switchtec_get_all_pin_sts(struct switchtec_dev *dev, uint32_t *values)
 	return 0;
 }
 
+/**
+ * @brief Perform a reset operation on the RTC counter
+ * @param[in] dev	  Switchtec device handle
+ * @return 0 on success, or a negative value on failure	
+ */
+int switchtec_rtc_counter_reset(struct switchtec_dev *dev, uint64_t *rtc_counter)
+{
+	int ret;
+	struct switchtec_rtc in, out;
+	in.sub_cmd = MRPC_RTC_RESET;
+	
+	ret = switchtec_cmd(dev, MRPC_RTC, &in, sizeof(in), &out, sizeof(out));
+	if (ret)
+		return ret;
+	
+	*rtc_counter = out.rtc_counter;
+
+	return 0;
+	
+}
+
+/**
+ * @brief Set the RTC counter
+ * @param[in] dev	  Switchtec device handle
+ * @param[in] rtc_counter Pointer to store the RTC counter value
+ * @return 0 on success, or a negative value on failure	
+ */
+int switchtec_rtc_counter_set(struct switchtec_dev *dev, uint64_t *rtc_counter)
+{
+	int ret;
+	struct switchtec_rtc in, out;
+
+	in.sub_cmd = MRPC_RTC_SET;
+	in.rtc_counter = *rtc_counter;
+	
+	ret = switchtec_cmd(dev, MRPC_RTC, &in, sizeof(in), &out, sizeof(out));
+	if (ret)
+		return ret;
+
+	return 0;
+	
+}
+
+/**
+ * @brief Get the RTC counter
+ * @param[in] dev	  Switchtec device handle
+ * @param[in] rtc_counter Pointer to store the RTC counter value
+ * @return 0 on success, or a negative value on failure	
+ */
+int switchtec_rtc_counter_get(struct switchtec_dev *dev, uint64_t *rtc_counter)
+{
+	int ret;
+	struct switchtec_rtc in, out;
+
+	in.sub_cmd = MRPC_RTC_GET;
+	
+	ret = switchtec_cmd(dev, MRPC_RTC, &in, sizeof(in), &out, sizeof(out));
+	if (ret)
+		return ret;
+	
+	*rtc_counter = out.rtc_counter;
+
+	return 0;
+	
+}
+
 /**@}*/

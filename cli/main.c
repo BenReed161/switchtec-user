@@ -2823,6 +2823,68 @@ static int evcntr_wait(int argc, char **argv)
 	return 0;
 }
 
+#define CMD_DESC_RTC "read the real-time clock"
+static int rtc(int argc, char **argv)
+{
+	int ret, operation;
+	uint64_t rtc_counter;
+
+	static struct {
+		struct switchtec_dev *dev;
+		uint64_t rtc_counter;
+		int rtc_reset;
+	} cfg = {};
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{"rtc_counter", 'r', "uS", CFG_INT, &cfg.rtc_counter, required_argument,
+		 "rtc counter in microseconds\n"},
+		{"reset rtc", 'R', "", CFG_NONE, &cfg.rtc_reset, no_argument,
+		 "reset rtc counter\n"},
+		{NULL}};
+
+	argconfig_parse(argc, argv, CMD_DESC_RTC, opts, &cfg, sizeof(cfg));
+	if (!switchtec_is_gen6(cfg.dev)) {
+		fprintf(stderr, "RTC only available on Gen6 switchtec devices\n");
+		return 1;
+	}
+	rtc_counter = cfg.rtc_counter;
+
+	if (cfg.rtc_counter && cfg.rtc_reset) {
+		fprintf(stderr, "Cannot both set and reset the RTC counter at once\n");
+		return 1;
+	}
+
+	if (cfg.rtc_counter) {
+		operation = 1;
+		printf("Setting RTC Counter to %ld microseconds\n", rtc_counter);
+	} else {
+		operation = 2;
+	}
+
+	if( cfg.rtc_reset) {
+		operation = 0;
+		printf("Resetting RTC Counter\n");
+	}
+	switch(operation) {
+		case MRPC_RTC_RESET:
+			ret = switchtec_rtc_counter_reset(cfg.dev, &rtc_counter);
+		case MRPC_RTC_SET:
+			ret = switchtec_rtc_counter_set(cfg.dev,  &rtc_counter);
+		case MRPC_RTC_GET:
+			ret = switchtec_rtc_counter_get(cfg.dev, &rtc_counter);
+
+	}
+	if (ret) {
+		perror("rtc");
+		return 1;
+	}
+	
+	if (operation == MRPC_RTC_GET || cfg.rtc_reset)
+		printf("RTC Counter: %ld microseconds, %ld seconds\n", rtc_counter, rtc_counter / 1000000);
+	printf("RTC operation successful\n");
+
+	return 0;
+}
 static const struct cmd commands[] = {
 	CMD(list, CMD_DESC_LIST),
 	CMD(info, CMD_DESC_INFO),
@@ -2853,6 +2915,7 @@ static const struct cmd commands[] = {
 	CMD(evcntr_show, CMD_DESC_EVCNTR_SHOW),
 	CMD(evcntr_del, CMD_DESC_EVCNTR_DEL),
 	CMD(evcntr_wait, CMD_DESC_EVCNTR_WAIT),
+	CMD(rtc, CMD_DESC_RTC),
 	{},
 };
 
