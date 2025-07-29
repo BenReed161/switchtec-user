@@ -594,7 +594,8 @@ static inline const char *switchtec_gen_str(struct switchtec_dev *dev)
 
 	str =  switchtec_is_gen3(dev) ? "GEN3" :
 	       switchtec_is_gen4(dev) ? "GEN4" :
-	       switchtec_is_gen5(dev) ? "GEN5" : "Unknown";
+	       switchtec_is_gen5(dev) ? "GEN5" :
+	       switchtec_is_gen6(dev) ? "GEN6" : "Unknown";
 
 	return str;
 }
