@@ -1028,6 +1028,15 @@ int switchtec_get_stack_bif(struct switchtec_dev *dev, int stack_id,
 			    int port_bif[SWITCHTEC_PORTS_PER_STACK]);
 int switchtec_set_stack_bif(struct switchtec_dev *dev, int stack_id,
 			    int port_bif[SWITCHTEC_PORTS_PER_STACK]);
+/********** RTC Counter **********/
+struct switchtec_rtc {
+	uint8_t sub_cmd;
+	uint8_t reserved[3];
+	uint64_t rtc_counter;
+};
+
+int switchtec_rtc_counter(struct switchtec_dev *dev, uint64_t *rtc_counter, 
+			  int opertaion);
 
 /******** GPIO Management ********/
 

@@ -127,7 +127,9 @@ enum mrpc_cmd {
 	MRPC_BOOTUP_RESUME_GEN5 = 0x11B,
 	MRPC_GEN5_EYE_CAPTURE = 0x142,
 	MRPC_FTDC_LOG_DUMP = 0x147,
-	MRPC_MAX_ID = 0x148,
+	MRPC_RTC = 0x14C,
+
+	MRPC_MAX_ID = 0x14D,
 };
 
 enum mrpc_bg_status {
@@ -320,6 +322,10 @@ enum mrpc_sub_cmd {
 	MRPC_OSA_STATUS_QUERY = 6,
 	MRPC_OSA_DATA_READ = 7,
 	MRPC_OSA_REL_ACCESS_PERM = 8,
+
+	MRPC_RTC_RESET = 0,
+	MRPC_RTC_SET = 1,
+	MRPC_RTC_GET = 2,
 };
 
 #endif

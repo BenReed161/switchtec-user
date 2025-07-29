@@ -2759,6 +2759,47 @@ static int evcntr_wait(int argc, char **argv)
 	return 0;
 }
 
+#define CMD_DESC_RTC "read the real-time clock"
+static int rtc(int argc, char **argv)
+{
+	int ret, operation;
+	uint64_t *rtc_counter;
+
+	static struct {
+		struct switchtec_dev *dev;
+		uint64_t rtc_counter;
+	} cfg = {};
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{"rtc_counter", 'r', "uS", CFG_INT, &cfg.rtc_counter, required_argument,
+		 "rtc counter in microseconds\nno arg : get rtc\narg = x : set rtc\narg = -1 : reset rtc"},
+		{NULL}};
+
+	argconfig_parse(argc, argv, CMD_DESC_RTC, opts, &cfg, sizeof(cfg));
+	if (switchtec_is_gen6(cfg.dev)) {
+		fprintf(stderr, "RTC only available on Gen6 switchtec devices\n");
+		return 1;
+	}
+
+	if (cfg.rtc_counter) {
+		rtc_counter = &cfg.rtc_counter;
+		if (cfg.rtc_counter == -1)
+			operation = 0;
+		else
+			operation = 1;
+	} else {
+		operation = 2;
+	}
+	ret = switchtec_rtc_counter(cfg.dev, rtc_counter, operation);
+	if (ret) {
+		perror("rtc");
+		return 1;
+	}
+	printf("RTC operation successful\n");
+
+	return 0;
+}
+
 static const struct cmd commands[] = {
 	CMD(list, CMD_DESC_LIST),
 	CMD(info, CMD_DESC_INFO),
@@ -2788,6 +2829,7 @@ static const struct cmd commands[] = {
 	CMD(evcntr_show, CMD_DESC_EVCNTR_SHOW),
 	CMD(evcntr_del, CMD_DESC_EVCNTR_DEL),
 	CMD(evcntr_wait, CMD_DESC_EVCNTR_WAIT),
+	CMD(rtc, CMD_DESC_RTC),
 	{},
 };
 
