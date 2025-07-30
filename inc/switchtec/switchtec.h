@@ -624,6 +624,7 @@ switchtec_fw_image_gen_str(struct switchtec_fw_image_info *inf)
 	case SWITCHTEC_GEN3: return "GEN3";
 	case SWITCHTEC_GEN4: return "GEN4";
 	case SWITCHTEC_GEN5: return "GEN5";
+	case SWITCHTEC_GEN6: return "GEN6";
 	default:	     return "UNKNOWN";
 	}
 }
