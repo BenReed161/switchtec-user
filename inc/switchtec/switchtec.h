@@ -50,7 +50,9 @@ struct switchtec_dev;
 
 #define SWITCHTEC_MAX_PARTS  48
 #define SWITCHTEC_MAX_PORTS  60
+#define SWITCHTEC_MAX_PORTS_GEN6 20
 #define SWITCHTEC_MAX_LANES  100
+#define SWITCHTEC_MAX_LANES_GEN6 144
 #define SWITCHTEC_MAX_STACKS 8
 #define SWITCHTEC_PORTS_PER_STACK 8
 #define SWITCHTEC_MAX_EVENT_COUNTERS 64
@@ -481,7 +483,8 @@ static inline int switchtec_is_gen6(struct switchtec_dev *dev)
  */
 static inline int switchtec_max_supported_ports(struct switchtec_dev *dev)
 {
-	return switchtec_is_gen5(dev) ? SWITCHTEC_MAX_PORTS :
+	return switchtec_is_gen6(dev) ? SWITCHTEC_MAX_PORTS_GEN6 :
+	       switchtec_is_gen5(dev) ? SWITCHTEC_MAX_PORTS :
 	       switchtec_is_gen4(dev) ? 52 : 48;
 }
 
