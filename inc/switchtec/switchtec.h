@@ -1320,7 +1320,8 @@ enum link_rate_enum {
 	PCIE_LINK_RATE_GEN3 = 3,  //!< Gen3, supports 2.5GT/s, 5GT/s, 8GT/s
 	PCIE_LINK_RATE_GEN4 = 4,  //!< Gen4, supports 2.5GT/s, 5GT/s, 8GT/s, 16GT/s
 	PCIE_LINK_RATE_GEN5 = 5,  //!< Gen5, supports 2.5GT/s, 5GT/s, 8GT/s, 16GT/s, 32GT/s
-	PCIE_LINK_RATE_NUM  = 5   //!< Total number of PCIe generations
+	PCIE_LINK_RATE_GEN6 = 6,  //!< Gen6, supports 2.5GT/s, 5GT/s, 8GT/s, 16GT/s, 32GT/s, 64GT/s
+	PCIE_LINK_RATE_NUM  = 6   //!< Total number of PCIe generations
 };
 
 struct switchtec_port_eq_coeff_in {
