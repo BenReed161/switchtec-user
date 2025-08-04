@@ -648,12 +648,33 @@ switchtec_fw_id_to_type_gen5(const struct switchtec_fw_image_info *info)
 }
 
 static enum switchtec_fw_type
+switchtec_fw_id_to_type_gen6(const struct switchtec_fw_image_info *info)
+{
+	switch (info->part_id) {
+	case SWITCHTEC_FW_PART_ID_G6_MAP0: return SWITCHTEC_FW_TYPE_MAP;
+	case SWITCHTEC_FW_PART_ID_G6_MAP1: return SWITCHTEC_FW_TYPE_MAP;
+	case SWITCHTEC_FW_PART_ID_G6_KEY0: return SWITCHTEC_FW_TYPE_KEY;
+	case SWITCHTEC_FW_PART_ID_G6_KEY1: return SWITCHTEC_FW_TYPE_KEY;
+	case SWITCHTEC_FW_PART_ID_G6_BL20: return SWITCHTEC_FW_TYPE_BL2;
+	case SWITCHTEC_FW_PART_ID_G6_BL21: return SWITCHTEC_FW_TYPE_BL2;
+	case SWITCHTEC_FW_PART_ID_G6_CFG0: return SWITCHTEC_FW_TYPE_CFG;
+	case SWITCHTEC_FW_PART_ID_G6_CFG1: return SWITCHTEC_FW_TYPE_CFG;
+	case SWITCHTEC_FW_PART_ID_G6_IMG0: return SWITCHTEC_FW_TYPE_IMG;
+	case SWITCHTEC_FW_PART_ID_G6_IMG1: return SWITCHTEC_FW_TYPE_IMG;
+	case SWITCHTEC_FW_PART_ID_G6_NVLOG: return SWITCHTEC_FW_TYPE_NVLOG;
+	case SWITCHTEC_FW_PART_ID_G6_SEEPROM: return SWITCHTEC_FW_TYPE_SEEPROM;
+	default: return SWITCHTEC_FW_TYPE_UNKNOWN;
+	}
+}
+
+static enum switchtec_fw_type
 switchtec_fw_id_to_type(const struct switchtec_fw_image_info *info)
 {
 	switch (info->gen) {
 	case SWITCHTEC_GEN3: return switchtec_fw_id_to_type_gen3(info);
 	case SWITCHTEC_GEN4: return switchtec_fw_id_to_type_gen4(info);
 	case SWITCHTEC_GEN5: return switchtec_fw_id_to_type_gen5(info);
+	case SWITCHTEC_GEN6: return switchtec_fw_id_to_type_gen6(info);
 	default: return SWITCHTEC_FW_TYPE_UNKNOWN;
 	}
 }
