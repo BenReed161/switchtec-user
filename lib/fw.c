@@ -412,6 +412,9 @@ enum switchtec_gen switchtec_fw_version_to_gen(unsigned int version)
 	case 6:
 	case 7:
 	case 8: return SWITCHTEC_GEN5;
+	case 9:
+	case 10:
+	case 11: return SWITCHTEC_GEN6;
 	default: return SWITCHTEC_GEN_UNKNOWN;
 	}
 }
