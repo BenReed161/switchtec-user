@@ -630,10 +630,10 @@ static int image_select(int argc, char **argv)
 	}
 	index.keyman = cfg.keyman;
 
-	if (switchtec_is_gen4(cfg.dev) &&
+	if (!switchtec_is_gen5(cfg.dev) &&
 	    cfg.riot != SWITCHTEC_ACTIVE_INDEX_NOT_SET) {
 		fprintf(stderr,
-			"RIOT image is not available on Gen4 devices!\n");
+			"RIOT image is only available on Gen5 devices!\n");
 		return -7;
 	}
 
