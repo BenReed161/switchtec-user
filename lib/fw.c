@@ -235,6 +235,68 @@ static int switchtec_fw_wait(struct switchtec_dev *dev,
 	return 0;
 }
 
+static int set_redundant(struct switchtec_dev *dev, int type, int set)
+{
+	int ret;
+	char *part_types[] = {
+		"KEYMAN",
+		"RIOT",
+		"BL2",
+		"CFG",
+		"MAIN-FW"
+	};
+
+	struct {
+		uint8_t subcmd;
+		uint8_t part_type;
+		uint8_t redundant_val;
+		uint8_t reserved;
+	} cmd;
+
+	cmd.subcmd = MRPC_FWDNLD_SET_RDNDNT;
+	cmd.redundant_val = set;
+	cmd.part_type = type;
+
+	printf("%s redundant flag \t(%s)\n", set ? "Checking" : "Un-checking", 
+	       part_types[type-1]);
+	ret = switchtec_cmd(dev, MRPC_FWDNLD, &cmd, sizeof(cmd), NULL, 0);
+	if (ret) {
+		fprintf(stderr, "Error: setting redudant flag \t(%s)\n", 
+			part_types[type-1]);
+		return 1;
+	}
+	else {
+		printf("Success: set redundant flag \t(%s)\n", 
+		       part_types[type-1]);
+	}
+	return 0;
+}
+
+/**
+ * @brief Set the redundant image flag for the specified image types
+ * @param[in] dev        Switchtec device handle
+ * @param[in] toggle_arr Pointer to the array of togglable image types
+ * @return 0 on success, error code on failure
+ */
+int switchtec_fw_set_redundant_flag (struct switchtec_dev *dev, int keyman, 
+				     int riot, int bl2, int cfg, int fw, 
+				     int set)
+{
+	int ret = 0;
+	if(keyman)
+		ret += set_redundant(dev, SWITCHTEC_PART_TYPE_KEYMAN, set);
+	if (riot)
+		ret += set_redundant(dev, SWITCHTEC_PART_TYPE_RC, set);
+	if (bl2)
+		ret += set_redundant(dev, SWITCHTEC_PART_TYPE_BL2, set);
+	if (cfg)
+		ret += set_redundant(dev, SWITCHTEC_PART_TYPE_CFG, set);
+	if (fw)
+		ret += set_redundant(dev, SWITCHTEC_PART_TYPE_FW, set);
+
+	return ret;
+}
+
 /**
  * @brief Toggle the active firmware partition for the main or configuration
  *	images.
@@ -1252,33 +1314,43 @@ static int switchtec_fw_part_info_gen5(struct switchtec_dev *dev,
 		part_info = &all->map1;
 		break;
 	case SWITCHTEC_FW_PART_ID_G5_RIOT0:
+		inf->redundant = all->riot_redundant_flag;
 		part_info = &all->riot0;
 		break;
 	case SWITCHTEC_FW_PART_ID_G5_RIOT1:
+		inf->redundant = all->riot_redundant_flag;
 		part_info = &all->riot1;
 		break;
 	case SWITCHTEC_FW_PART_ID_G5_KEY0:
+		inf->redundant = all->key_redundant_flag;
 		part_info = &all->keyman0;
 		break;
 	case SWITCHTEC_FW_PART_ID_G5_KEY1:
+		inf->redundant = all->key_redundant_flag;
 		part_info = &all->keyman1;
 		break;
 	case SWITCHTEC_FW_PART_ID_G5_BL20:
+		inf->redundant = all->bl2_redundant_flag;
 		part_info = &all->bl20;
 		break;
 	case SWITCHTEC_FW_PART_ID_G5_BL21:
+		inf->redundant = all->bl2_redundant_flag;
 		part_info = &all->bl21;
 		break;
 	case SWITCHTEC_FW_PART_ID_G5_IMG0:
+		inf->redundant = all->img_redundant_flag;
 		part_info = &all->img0;
 		break;
 	case SWITCHTEC_FW_PART_ID_G5_IMG1:
+		inf->redundant = all->img_redundant_flag;
 		part_info = &all->img1;
 		break;
 	case SWITCHTEC_FW_PART_ID_G5_CFG0:
+		inf->redundant = all->cfg_redundant_flag;
 		part_info = &all->cfg0;
 		break;
 	case SWITCHTEC_FW_PART_ID_G5_CFG1:
+		inf->redundant = all->cfg_redundant_flag;
 		part_info = &all->cfg1;
 		break;
 	case SWITCHTEC_FW_PART_ID_G5_NVLOG:
