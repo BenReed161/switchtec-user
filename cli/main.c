@@ -1906,11 +1906,12 @@ static void print_fw_part_line(const char *tag,
 	if (!inf)
 		return;
 
-	printf("  %-4s\tVersion: %-8s\tCRC: %08lx\t%4s%11s%s\n",
+	printf("  %-4s\tVersion: %-8s\tCRC: %08lx\t%4s%11s%s%s\n",
 	       tag, inf->version, inf->image_crc,
 	       inf->read_only ? "(RO)" : "",
 	       inf->running ? "  (Running)" : "",
-	       inf->valid ? "" : "  (Invalid)");
+	       inf->valid ? "" : "  (Invalid)",
+	       inf->redundant ? "  (Redundant)" : "");
 }
 
 static int print_fw_part_info(struct switchtec_dev *dev)
@@ -2138,7 +2139,7 @@ set_boot_ro:
 	return ret;
 }
 
-#define CMD_DESC_FW_TOGGLE "toggle the active and inactive firmware partitions (BL2, Main Firmware)"
+#define CMD_DESC_FW_TOGGLE "toggle the active and inactive firmware partitions (BL2, Main Firmware) And set redundants for image partitons"
 
 static int fw_toggle(int argc, char **argv)
 {
@@ -2152,7 +2153,10 @@ static int fw_toggle(int argc, char **argv)
 		int firmware;
 		int config;
 		int riotcore;
-	} cfg = {};
+		int redundant;
+	} cfg = {
+		.redundant = -1,
+	};
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
 		{"bl2", 'b', "", CFG_NONE, &cfg.bl2, no_argument,
@@ -2165,11 +2169,29 @@ static int fw_toggle(int argc, char **argv)
 		 "toggle CFG data"},
 		{"riotcore", 'r', "", CFG_NONE, &cfg.riotcore, no_argument,
 		 "toggle RIOTCORE - Gen5 switch only"},
+		{"redundant", 'R', "0/1", CFG_INT, &cfg.redundant, required_argument, 
+		 "Set the redundant flag for the selected image type(s) - Gen 5 switch only"},
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_DESC_FW_TOGGLE, opts, &cfg, sizeof(cfg));
 
-	if (!cfg.bl2 && !cfg.key && !cfg.firmware && !cfg.config && !cfg.riotcore) {
+	if (cfg.redundant != -1 && !switchtec_is_gen5(cfg.dev)) {
+		fprintf(stderr, "Setting the redundant flag is only supported on Gen5 switches\n");
+		return 1;
+	}
+
+	if (cfg.redundant != -1) {
+		if (cfg.redundant > 1) {
+			fprintf(stderr, "Set redundant flag to either enabled - 1 or disabled - 0\n");
+			return 1;
+		}
+		ret = switchtec_fw_set_redundant_flag(cfg.dev, cfg.key, 
+						      cfg.riotcore, cfg.bl2, 
+						      cfg.config, cfg.firmware, 
+						      cfg.redundant);
+		if (ret)
+			err = errno;
+	} else if (!cfg.bl2 && !cfg.key && !cfg.firmware && !cfg.config && !cfg.riotcore) {
 		fprintf(stderr, "NOTE: Not toggling images as no "
 			"partition type options were specified\n\n");
 	} else if ((cfg.bl2 || cfg.key || cfg.riotcore) && switchtec_is_gen3(cfg.dev)) {
@@ -2177,7 +2199,7 @@ static int fw_toggle(int argc, char **argv)
 			"are not supported by Gen3 switches\n");
 		return 1;
 	} else if (cfg.riotcore && switchtec_is_gen4(cfg.dev)){
-		fprintf(stderr, "Firmware type RIOTCORE is not supported by Gen4 switchtes\n");
+		fprintf(stderr, "Firmware type RIOTCORE is not supported by Gen4 switches\n");
 		return 1;
 	} else {
 		ret = switchtec_fw_toggle_active_partition(cfg.dev,
