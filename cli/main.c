@@ -1698,7 +1698,10 @@ static int gpio(int argc, char **argv)
 		int get_pin_sts;
 		int log_pin_id;
 		int pin_val;
-	} cfg = {};
+	} cfg = {
+		.en_gpio_int = -1,
+		.pin_val = -1,
+	};
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
 		{"get_dir_config", 'd', "", CFG_NONE, &cfg.get_dir_cfg, 
@@ -1733,7 +1736,7 @@ static int gpio(int argc, char **argv)
 	}
 
 	if ((cfg.get_dir_cfg || cfg.get_pol_config 
-	     || cfg.get_pin_sts || cfg.en_gpio_int) && cfg.pin_val) {
+	     || cfg.get_pin_sts || cfg.en_gpio_int != -1) && cfg.pin_val != -1) {
 		printf("Cannot set pin value for the selected sub-command(s), ignoring -v --gpio_pin_value..\n");
 	}
 
@@ -1755,7 +1758,7 @@ static int gpio(int argc, char **argv)
 		}
 		printf("Polarity configuration of GPIO logical pin %d is %s\n", 
 		       cfg.log_pin_id, polarity ? "Non-Inverted" : "Inverted");
-	} else if (cfg.en_gpio_int) {
+	} else if (cfg.en_gpio_int != -1) {
 		ret = switchtec_en_dis_interrupt(cfg.dev, cfg.log_pin_id, 
 						 cfg.en_gpio_int);
 		if (ret) {
@@ -1774,7 +1777,7 @@ static int gpio(int argc, char **argv)
 		printf("DW\tDW VALUE\n");
 		for (int i = 0; i < SWITCHTEC_MAX_GPIO_PIN_VALS; i++)
 			printf("%d\t0x%08x\n", i, values[i]);
-	} else if (cfg.pin_val) {
+	} else if (cfg.pin_val != -1) {
 		printf("Setting value of logical GPIO pin %d to: %d\n", 
 			cfg.log_pin_id, cfg.pin_val);
 		ret = switchtec_set_gpio(cfg.dev, cfg.log_pin_id, cfg.pin_val);
