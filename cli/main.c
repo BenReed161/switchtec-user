@@ -1762,7 +1762,10 @@ static int gpio(int argc, char **argv)
 		ret = switchtec_en_dis_interrupt(cfg.dev, cfg.log_pin_id, 
 						 cfg.en_gpio_int);
 		if (ret) {
-			switchtec_perror("switchtec_get_gpio");
+			if (ret == -61)
+				printf("MRPC Error 0x4200a: Adapter array is full\n");
+			else
+				switchtec_perror("switchtec_get_gpio");
 			return 1;
 		}
 		printf("%s the interrupt at GPIO logical pin %d\n", 
