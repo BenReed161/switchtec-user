@@ -1701,6 +1701,7 @@ static int gpio(int argc, char **argv)
 	} cfg = {
 		.en_gpio_int = -1,
 		.pin_val = -1,
+		.log_pin_id = -1,
 	};
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
@@ -1722,7 +1723,7 @@ static int gpio(int argc, char **argv)
 	};
 
 	argconfig_parse(argc, argv, CMD_DESC_GPIO, opts, &cfg, sizeof(cfg));
-	if (!cfg.log_pin_id && !cfg.get_pin_sts) {
+	if (cfg.log_pin_id == -1 && !cfg.get_pin_sts) {
 		printf("You must specify a logicial pin ID --help\n");
 		return -1;
 	}
