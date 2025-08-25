@@ -2226,8 +2226,6 @@ int switchtec_osa_config_type(struct switchtec_dev *dev, int stack_id,
 	osa_type_config_in.link_rate = link_rate;
 	osa_type_config_in.os_types = os_types;
 
-	printf("%d : %d : %d : %d : %d\n", stack_id, lane_mask, direction,
-	       link_rate, os_types);
 	ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER, &osa_type_config_in,
 			    sizeof(osa_type_config_in), NULL, 0);
 	if (ret) {
@@ -2291,31 +2289,102 @@ int switchtec_osa_dump_conf(struct switchtec_dev *dev, int stack_id)
 		return ret;
 	}
 	printf("Config dump \n");
-	printf("---- OS Type ---------------\n");
-	printf("lane mask: \t\t%d\n", osa_dmp_out.os_type_trig_lane_mask);
-	printf("direciton: \t\t%d\n", osa_dmp_out.os_type_trig_dir);
-	printf("link rate: \t\t%d\n", osa_dmp_out.os_type_trig_link_rate);
-	printf("os types: \t\t%d\n", osa_dmp_out.os_type_trig_os_types);
-	printf("---- OS Pattern ------------\n");
-	printf("lane mask: \t\t%d\n", osa_dmp_out.os_pat_trig_lane_mask);
-	printf("direciton: \t\t%d\n", osa_dmp_out.os_pat_trig_dir);
-	printf("link rate: \t\t%d\n", osa_dmp_out.os_pat_trig_link_rate);
-	printf("patttern: \t\t%d %d %d %d\n", osa_dmp_out.os_pat_trig_val_dw0,
+	printf("------- OS Type ------------------------\n");
+	printf("lanes: \t\t\t%s", osa_dmp_out.os_type_trig_lane_mask & 1 ? "0," : "");
+	char lane[5];
+	for (int i = 1; i < 16; i++) {
+		if (i == 15)
+			sprintf(lane, "%d", i);
+		else
+			sprintf(lane, "%d,", i);
+		printf("%s", (osa_dmp_out.os_type_trig_lane_mask >> i) & i ? lane : "");
+	}
+	printf("\n");
+
+	printf("direciton: \t\t%s", osa_dmp_out.os_type_trig_dir & 1 ? "RX," : "");
+	printf("%s\n", (osa_dmp_out.os_type_trig_dir >> 1) & 1 ? "TX" : "");
+
+	printf("link rate: \t\t%s", osa_dmp_out.os_type_trig_link_rate & 1 ? "GEN1," : "");
+	printf("%s", (osa_dmp_out.os_type_trig_link_rate >> 1) & 1 ? "GEN2," : "");
+	printf("%s", (osa_dmp_out.os_type_trig_link_rate >> 2) & 1 ? "GEN3," : "");
+	printf("%s", (osa_dmp_out.os_type_trig_link_rate >> 3) & 1 ? "GEN4," : "");
+	printf("%s\n", (osa_dmp_out.os_type_trig_link_rate >> 4) & 1 ? "GEN5" : "");
+
+	printf("os types: \t\t%s", osa_dmp_out.os_type_trig_os_types & 1 ? "TS1," : "");
+	printf("%s", (osa_dmp_out.os_type_trig_os_types >> 1) & 1 ? "TS2," : "");
+	printf("%s", (osa_dmp_out.os_type_trig_os_types >> 2) & 1 ? "FTS," : "");
+	printf("%s\n", (osa_dmp_out.os_type_trig_os_types >> 3) & 1 ? "CTL_SKP" : "");
+
+	printf("------- OS Pattern ---------------------\n");
+	printf("lanes: \t\t\t%s", osa_dmp_out.os_pat_trig_lane_mask & 1 ? "0," : "");
+	for (int i = 1; i < 16; i++) {
+		if (i == 15)
+			sprintf(lane, "%d", i);
+		else
+			sprintf(lane, "%d,", i);
+		printf("%s", (osa_dmp_out.os_pat_trig_lane_mask >> i) & i ? lane : "");
+	}
+	printf("\n");
+
+	printf("direciton: \t\t%s", osa_dmp_out.os_pat_trig_dir & 1 ? "RX," : "");
+	printf("%s\n", (osa_dmp_out.os_pat_trig_dir >> 1) & 1 ? "TX" : "");
+
+	printf("link rate: \t\t%s", osa_dmp_out.os_pat_trig_link_rate && 1 ? "GEN1," : "");
+	printf("%s", (osa_dmp_out.os_pat_trig_link_rate >> 1) & 1 ? "GEN2," : "");
+	printf("%s", (osa_dmp_out.os_pat_trig_link_rate >> 2) & 1 ? "GEN3," : "");
+	printf("%s", (osa_dmp_out.os_pat_trig_link_rate >> 3) & 1 ? "GEN4," : "");
+	printf("%s\n", (osa_dmp_out.os_pat_trig_link_rate >> 4) & 1 ? "GEN5" : "");
+	
+	printf("patttern: \t\t0x%08x %08x %08x %08x\n", osa_dmp_out.os_pat_trig_val_dw0,
 	       osa_dmp_out.os_pat_trig_val_dw1, osa_dmp_out.os_pat_trig_val_dw2,
 	       osa_dmp_out.os_pat_trig_val_dw3);
-	printf("mask: \t\t\t%d %d %d %d\n", osa_dmp_out.os_pat_trig_mask_dw0,
+	printf("mask: \t\t\t0x%08x %08x %08x %08x\n", osa_dmp_out.os_pat_trig_mask_dw0,
 	       osa_dmp_out.os_pat_trig_mask_dw1, osa_dmp_out.os_pat_trig_mask_dw2,
 	       osa_dmp_out.os_pat_trig_mask_dw3);
-	printf("---- Misc ------------------\n");
-	printf("Misc trigger enabled: \t%d\n", osa_dmp_out.misc_trig_en);
-	printf("---- Capture ---------------\n");
-	printf("lane mask: \t\t%d\n", osa_dmp_out.capture_lane_mask);
-	printf("direciton: \t\t%d\n", osa_dmp_out.capture_dir);
-	printf("drop single os: \t%d\n", osa_dmp_out.capture_drop_os);
-	printf("stop mode: \t\t%d\n", osa_dmp_out.capture_stop_mode);
-	printf("snaphot mode: \t\t%d\n", osa_dmp_out.capture_snap_mode);
+	
+	printf("------- Misc ---------------------------\n");
+	if (osa_dmp_out.misc_trig_en == 2 || osa_dmp_out.misc_trig_en == 0)
+		printf("Misc trigger disabled");
+	else
+		printf("Misc trigger enabled: \t");
+	printf("%s", (osa_dmp_out.misc_trig_en - 2) & 1 ? "LTMON/other HW blk, " : "");
+	printf("%s\n", ((osa_dmp_out.misc_trig_en - 2) >> 2 ) & 1 ? "General purpose input" : "");
+
+	printf("------- Capture ------------------------\n");
+	printf("lanes: \t\t\t%s", osa_dmp_out.capture_lane_mask & 1 ? "0," : "");
+	for (int i = 1; i < 16; i++) {
+		if (i == 15)
+			sprintf(lane, "%d", i);
+		else
+			sprintf(lane, "%d,", i);
+		printf("%s", (osa_dmp_out.capture_lane_mask >> i) & i ? lane : "");
+	}
+	printf("\n");
+
+	printf("direciton: \t\t%s", osa_dmp_out.capture_dir & 1 ? "RX," : "");
+	printf("%s\n", (osa_dmp_out.capture_dir >> 1) & 1 ? "TX" : "");
+
+	printf("drop single os: \t%d: Single TS1, TS2, FTS and CTL_SKP OS's %s in the capture\n", 
+		osa_dmp_out.capture_drop_os, 
+		osa_dmp_out.capture_drop_os ? " excluded" : "included");
+	printf("stop mode: \t\t%d: OSA will stop capturing after %s lane has stopped writing into %s allocated RAMs\n", 
+		osa_dmp_out.capture_stop_mode,
+		osa_dmp_out.capture_stop_mode ? "all" : "any",
+		osa_dmp_out.capture_stop_mode ? "their" : "its");
+	printf("snaphot mode: \t\t%d: OSes are captured %s\n", 
+		osa_dmp_out.capture_snap_mode, 
+		osa_dmp_out.capture_snap_mode ? "until the RAM is full" : "according to the Post-Trigger Entries value");
 	printf("post-trigger entries: \t%d\n", osa_dmp_out.capture_post_trig_entries);
-	printf("os types: \t\t%d\n", osa_dmp_out.capture_os_types);
+	
+	printf("os types: \t\t%s", (osa_dmp_out.capture_os_types & 1) ? "TS1," : "");
+	printf("%s", (osa_dmp_out.capture_os_types >> 1) & 1 ? "TS2," : "");
+	printf("%s", (osa_dmp_out.capture_os_types >> 2) & 1 ? "FTS," : "");
+	printf("%s", (osa_dmp_out.capture_os_types >> 3) & 1 ? "CTL_SKP," : "");
+	printf("%s", (osa_dmp_out.capture_os_types >> 4) & 1 ? "SKP," : "");
+	printf("%s", (osa_dmp_out.capture_os_types >> 5) & 1 ? "EIEOS," : "");
+	printf("%s", (osa_dmp_out.capture_os_types >> 6) & 1 ? "EIOS," : "");
+	printf("%s", (osa_dmp_out.capture_os_types >> 7) & 1 ? "ERR_OS," : "");
+	printf("\n");
 	return ret;
 }
 
