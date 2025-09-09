@@ -953,7 +953,9 @@ int switchtec_fw_exec(struct switchtec_dev *dev,
 	cmd.subcmd = MRPC_FW_TX_EXEC;
 	cmd.recovery_mode = recovery_mode;
 
-	if (switchtec_is_gen5(dev) || switchtec_is_gen6(dev))
+	if (switchtec_is_gen6(dev))
+		cmd_id = MRPC_FW_TX_GEN6;
+	if (switchtec_is_gen5(dev))
 		cmd_id = MRPC_FW_TX_GEN5;
 
 	return switchtec_mfg_cmd(dev, cmd_id, &cmd, sizeof(cmd), NULL, 0);

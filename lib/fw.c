@@ -189,10 +189,12 @@ struct switchtec_fw_image_header_gen3 {
 
 static uint32_t get_fw_tx_id(struct switchtec_dev *dev)
 {
+	if (switchtec_is_gen6(dev))
+		return MRPC_FW_TX_GEN6;
 	if (switchtec_is_gen5(dev))
 		return MRPC_FW_TX_GEN5;
-	else
-		return MRPC_FW_TX;
+	
+	return MRPC_FW_TX;
 }
 
 static int switchtec_fw_dlstatus(struct switchtec_dev *dev,
