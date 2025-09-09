@@ -182,12 +182,14 @@ static int get_configs(struct switchtec_dev *dev,
 	return ret;
 }
 
-static int get_configs_gen5(struct switchtec_dev *dev,
+static int get_configs_gen56(struct switchtec_dev *dev,
 			    struct get_cfgs_reply_gen5 *cfgs)
 {
 	uint32_t subcmd = 0;
 
 	return switchtec_mfg_cmd(dev,
+				 switchtec_is_gen6(dev) 
+				 ? MRPC_SECURITY_CONFIG_GET_GEN6 :
 				 MRPC_SECURITY_CONFIG_GET_GEN5,
 				 &subcmd, sizeof(subcmd),
 				 cfgs, sizeof(struct get_cfgs_reply_gen5));
@@ -379,7 +381,7 @@ static int security_config_get_gen5(struct switchtec_dev *dev,
 	struct get_cfgs_reply_gen5 reply;
 	int attn_mode;
 
-	ret = get_configs_gen5(dev, &reply);
+	ret = get_configs_gen56(dev, &reply);
 	if (ret)
 		return ret;
 
@@ -479,7 +481,7 @@ static int security_config_get_gen5(struct switchtec_dev *dev,
 int switchtec_security_config_get(struct switchtec_dev *dev,
 				  struct switchtec_security_cfg_state *state)
 {
-	if (switchtec_is_gen5(dev))
+	if (switchtec_is_gen5(dev) || switchtec_is_gen6(dev))
 		return security_config_get_gen5(dev, state);
 	else
 		return security_config_get(dev, state);
@@ -515,7 +517,7 @@ static int mailbox_to_file(struct switchtec_dev *dev, int fd)
 	return 0;
 }
 
-static int mailbox_to_file_gen5(struct switchtec_dev *dev, int fd)
+static int mailbox_to_file_gen56(struct switchtec_dev *dev, int fd)
 {
 	int ret;
 	struct mb_read {
@@ -533,8 +535,11 @@ static int mailbox_to_file_gen5(struct switchtec_dev *dev, int fd)
 	read.subcmd = 0;
 	read.num_to_read = htole32(SWITCHTEC_MB_MAX_ENTRIES);
 
+	enum mrpc_cmd cmd_id = switchtec_is_gen6(dev) ?
+				MRPC_MAILBOX_GET_GEN6 : MRPC_MAILBOX_GET_GEN5;
+
 	do {
-		ret = switchtec_mfg_cmd(dev, MRPC_MAILBOX_GET_GEN5,
+		ret = switchtec_mfg_cmd(dev, cmd_id,
 					&read, sizeof(read),
 					&reply,  sizeof(reply));
 		if (ret)
@@ -560,8 +565,8 @@ static int mailbox_to_file_gen5(struct switchtec_dev *dev, int fd)
  */
 int switchtec_mailbox_to_file(struct switchtec_dev *dev, int fd)
 {
-	if (switchtec_is_gen5(dev))
-		return mailbox_to_file_gen5(dev, fd);
+	if (switchtec_is_gen5(dev) || switchtec_is_gen6(dev))
+		return mailbox_to_file_gen56(dev, fd);
 	else
 		return mailbox_to_file(dev, fd);
 }
@@ -672,7 +677,7 @@ static int security_config_set_gen5(struct switchtec_dev *dev,
 	int spi_clk;
 	uint8_t cmd_buf[64]={};
 
-	ret = get_configs_gen5(dev, &reply);
+	ret = get_configs_gen56(dev, &reply);
 	if (ret)
 		return ret;
 
@@ -953,7 +958,9 @@ int switchtec_fw_exec(struct switchtec_dev *dev,
 	cmd.subcmd = MRPC_FW_TX_EXEC;
 	cmd.recovery_mode = recovery_mode;
 
-	if (switchtec_is_gen5(dev) || switchtec_is_gen6(dev))
+	if (switchtec_is_gen6(dev))
+		cmd_id = MRPC_FW_TX_GEN6;
+	if (switchtec_is_gen5(dev))
 		cmd_id = MRPC_FW_TX_GEN5;
 
 	return switchtec_mfg_cmd(dev, cmd_id, &cmd, sizeof(cmd), NULL, 0);
@@ -1279,7 +1286,7 @@ static int read_sec_cfg_file_gen5(struct switchtec_dev *dev,
 	int ret;
 	int attest_mode;
 
-	ret = get_configs_gen5(dev, &reply);
+	ret = get_configs_gen56(dev, &reply);
 	if (ret)
 		return ret;
 
@@ -1698,7 +1705,7 @@ static int sn_ver_get_gen4(struct switchtec_dev *dev,
 	return 0;
 }
 
-static int sn_ver_get_gen5(struct switchtec_dev *dev,
+static int sn_ver_get_gen56(struct switchtec_dev *dev,
 			   struct switchtec_sn_ver_info *info)
 {
 	int ret;
@@ -1712,7 +1719,10 @@ static int sn_ver_get_gen5(struct switchtec_dev *dev,
 		uint32_t ver_sec_unlock;
 	} reply;
 
-	ret = switchtec_mfg_cmd(dev, MRPC_SN_VER_GET_GEN5, &subcmd, 4,
+	enum mrpc_cmd cmd_id = switchtec_is_gen6(dev) ?
+			MRPC_SN_VER_GET_GEN6 : MRPC_SN_VER_GET_GEN5;
+
+	ret = switchtec_mfg_cmd(dev, cmd_id, &subcmd, 4,
 				&reply, sizeof(reply));
 	if (ret)
 		return ret;
@@ -1737,8 +1747,8 @@ static int sn_ver_get_gen5(struct switchtec_dev *dev,
 int switchtec_sn_ver_get(struct switchtec_dev *dev,
 			 struct switchtec_sn_ver_info *info)
 {
-	if (switchtec_is_gen5(dev))
-		return sn_ver_get_gen5(dev, info);
+	if (switchtec_is_gen5(dev) || switchtec_is_gen6(dev))
+		return sn_ver_get_gen56(dev, info);
 	else
 		return sn_ver_get_gen4(dev, info);
 }
