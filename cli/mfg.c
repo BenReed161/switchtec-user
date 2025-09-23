@@ -686,6 +686,10 @@ static int boot_resume(int argc, char **argv)
 	};
 
 	argconfig_parse(argc, argv, desc, opts, &cfg, sizeof(cfg));
+	if (switchtec_is_gen6(cfg.dev)) {
+		fprintf(stderr, "Boot resume is not supported on Gen6 switches\n");
+		return -1;
+	}
 
 	if (switchtec_boot_phase(cfg.dev) == SWITCHTEC_BOOT_PHASE_FW) {
 		fprintf(stderr,
