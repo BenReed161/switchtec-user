@@ -1906,11 +1906,12 @@ static void print_fw_part_line(const char *tag,
 	if (!inf)
 		return;
 
-	printf("  %-4s\tVersion: %-8s\tCRC: %08lx\t%4s%11s%s\n",
+	printf("  %-4s\tVersion: %-8s\tCRC: %08lx\t%4s%11s%s%s\n",
 	       tag, inf->version, inf->image_crc,
 	       inf->read_only ? "(RO)" : "",
 	       inf->running ? "  (Running)" : "",
-	       inf->valid ? "" : "  (Invalid)");
+	       inf->valid ? "" : "  (Invalid)",
+	       inf->redundant ? "  (Redundant)" : "");
 }
 
 static int print_fw_part_info(struct switchtec_dev *dev)
@@ -2177,7 +2178,7 @@ static int fw_toggle(int argc, char **argv)
 			"are not supported by Gen3 switches\n");
 		return 1;
 	} else if (cfg.riotcore && switchtec_is_gen4(cfg.dev)){
-		fprintf(stderr, "Firmware type RIOTCORE is not supported by Gen4 switchtes\n");
+		fprintf(stderr, "Firmware type RIOTCORE is not supported by Gen4 switches\n");
 		return 1;
 	} else {
 		ret = switchtec_fw_toggle_active_partition(cfg.dev,
@@ -2202,6 +2203,69 @@ static int fw_toggle(int argc, char **argv)
 	else
 		printf("firmware toggle: Success\n");
 
+	return ret;
+}
+
+#define CMD_DESC_FW_REDUNDANT "Set an image partition to redundant"
+static int fw_redundant(int argc, char **argv)
+{
+
+	int ret = 0;
+
+	static struct {
+		struct switchtec_dev *dev;
+		int bl2;
+		int key;
+		int firmware;
+		int config;
+		int riotcore;
+		int redundant;
+	} cfg = {
+		.redundant = 1,
+	};
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{"bl2", 'b', "", CFG_NONE, &cfg.bl2, no_argument,
+		 "Set redundancy flag for bl2 partition"},
+		{"key", 'k', "", CFG_NONE, &cfg.key, no_argument,
+		 "Set redundancy flag for Key manifest partition"},
+		{"firmware", 'f', "", CFG_NONE, &cfg.firmware, no_argument,
+		 "Set redundancy flag for main FW image partition"},
+		{"config", 'c', "", CFG_NONE, &cfg.config, no_argument,
+		 "Set redundancy flag for data CFG partition"},
+		{"riotcore", 'r', "", CFG_NONE, &cfg.riotcore, no_argument,
+		 "Set redundancy flag for RIOTCORE partition"},
+		{"redundant", 'R', "unset - 0 / set - 1", CFG_INT, &cfg.redundant, required_argument, 
+		 "Set the redundant flag for the selected image type(s). If left blank will set (1)"},
+		{NULL}};
+
+	argconfig_parse(argc, argv, CMD_DESC_FW_REDUNDANT, opts, &cfg, sizeof(cfg));
+
+	if (!switchtec_is_gen5(cfg.dev)) {
+		fprintf(stderr, "Setting the redundant flag is only supported on Gen5 switches\n");
+		return 1;
+	}
+	if (!cfg.bl2 && !cfg.key && !cfg.firmware && !cfg.config && !cfg.riotcore) {
+		fprintf(stderr, "Not setting image partition(s) as redundant since no partition type was specified\n");
+		return 1;
+	}
+	if (cfg.redundant > 1) {
+		fprintf(stderr, "Set redundant flag to either set - 1 or unset - 0\n");
+		return 1;
+	}
+
+	ret = switchtec_fw_set_redundant_flag(cfg.dev, cfg.key, 
+					      cfg.riotcore, cfg.bl2, 
+					      cfg.config, cfg.firmware, 
+					      cfg.redundant);
+	if (ret)
+		switchtec_perror("set redundant flag");
+	
+	ret = print_fw_part_info(cfg.dev);
+	if (ret)
+		switchtec_perror("print fw info");
+
+	printf("\n");
 	return ret;
 }
 
@@ -2822,6 +2886,7 @@ static const struct cmd commands[] = {
 	CMD(fw_update, CMD_DESC_FW_UPDATE),
 	CMD(fw_info, CMD_DESC_FW_INFO),
 	CMD(fw_toggle, CMD_DESC_FW_TOGGLE),
+	CMD(fw_redundant, CMD_DESC_FW_REDUNDANT),
 	CMD(fw_read, CMD_DESC_FW_READ),
 	CMD(fw_img_info, CMD_DESC_FW_IMG_INFO),
 	CMD(evcntr, CMD_DESC_EVCNTR),

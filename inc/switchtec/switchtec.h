@@ -119,6 +119,17 @@ enum switchtec_boot_phase {
 };
 
 /**
+ * @brief Device parition types GEN5
+ */
+enum switchtec_parition_types {
+	SWITCHTEC_PART_TYPE_KEYMAN = 1,
+	SWITCHTEC_PART_TYPE_RC = 2,
+	SWITCHTEC_PART_TYPE_BL2 = 3,
+	SWITCHTEC_PART_TYPE_CFG = 4,
+	SWITCHTEC_PART_TYPE_FW = 5
+};
+
+/**
  * @brief The variant types of Switchtec device
  */
 enum switchtec_variant {
@@ -280,6 +291,7 @@ struct switchtec_fw_image_info {
 
 	unsigned long secure_version;
 	bool signed_image;
+	uint8_t redundant;
 };
 
 struct switchtec_fw_part_summary {
@@ -985,6 +997,10 @@ enum switchtec_fw_ro {
 	SWITCHTEC_FW_RO = 1,
 };
 
+int switchtec_fw_set_redundant_flag(struct switchtec_dev *dev, 
+				    int keyman, int riot, 
+				    int bl2, int cfg, int fw, 
+				    int set);
 int switchtec_fw_toggle_active_partition(struct switchtec_dev *dev,
 					 int toggle_bl2, int toggle_key,
 					 int toggle_fw, int toggle_cfg,
@@ -1570,6 +1586,8 @@ int switchtec_diag_port_eq_tx_fslf(struct switchtec_dev *dev, int port_id,
 int switchtec_diag_perm_table(struct switchtec_dev *dev,
 			      struct switchtec_mrpc table[MRPC_MAX_ID]);
 int switchtec_diag_refclk_ctl(struct switchtec_dev *dev, int stack_id, bool en);
+int switchtec_diag_refclk_status(struct switchtec_dev *dev, uint8_t *stack_info);
+int switchtec_diag_ltssm_clear(struct switchtec_dev *dev, int port);
 int switchtec_diag_ltssm_log(struct switchtec_dev *dev,
 			     int port, int *log_count,
 			     struct switchtec_diag_ltssm_log *log_data);
