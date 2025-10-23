@@ -2075,6 +2075,8 @@ int switchtec_osa_capture_data(struct switchtec_dev *dev, int stack_id,
 	} osa_status_query_out;
 
 	osa_status_query_in.sub_cmd = MRPC_OSA_STATUS_QUERY;
+	if (switchtec_is_gen6(dev))
+		osa_status_query_in.sub_cmd = MRPC_OSA_STATUS_QUERY_GEN6;
 	osa_status_query_in.stack_id = stack_id;
 
 	ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER, &osa_status_query_in,
@@ -2142,6 +2144,8 @@ int switchtec_osa_capture_control(struct switchtec_dev *dev, int stack_id,
 	struct osa_capture_ctrl_in osa_capture_ctrl_in = {0};
 
 	osa_capture_ctrl_in.sub_cmd = MRPC_OSA_CAPTURE_CTRL;
+	if (switchtec_is_gen6(dev))
+		osa_capture_ctrl_in.sub_cmd = MRPC_OSA_CAPTURE_CTRL_GEN6;
 	osa_capture_ctrl_in.stack_id = stack_id;
 	osa_capture_ctrl_in.lane_mask = lane_mask;
 	osa_capture_ctrl_in.direction = direction;
@@ -2228,6 +2232,8 @@ int switchtec_osa_config_type(struct switchtec_dev *dev, int stack_id,
 	struct osa_type_config_in osa_type_config_in = {0};
 
 	osa_type_config_in.sub_cmd = MRPC_OSA_TYPE_TRIG_CONFIG;
+	if (switchtec_is_gen6(dev))
+		osa_type_config_in.sub_cmd = MRPC_OSA_TYPE_TRIG_CONFIG_GEN6;
 	osa_type_config_in.stack_id = stack_id;
 	osa_type_config_in.lane_mask = lane_mask;
 	osa_type_config_in.direction = direction;
@@ -2290,6 +2296,8 @@ int switchtec_osa_dump_conf(struct switchtec_dev *dev, int stack_id)
 
 	osa_dmp_in.stack_id = stack_id;
 	osa_dmp_in.sub_cmd = MRPC_OSA_CONFIG_DMP;
+	if (switchtec_is_gen6(dev))
+		osa_dmp_in.sub_cmd = MRPC_OSA_CONFIG_DMP_GEN6;
 
 	ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER, &osa_dmp_in,
 			    sizeof(osa_dmp_in), &osa_dmp_out,
@@ -2375,6 +2383,8 @@ int switchtec_osa(struct switchtec_dev *dev, int stack_id, int operation)
 	}
 	else if (operation == 5) {
 		osa_status_query_in.sub_cmd = MRPC_OSA_STATUS_QUERY;
+		if (switchtec_is_gen6(dev))
+			osa_status_query_in.sub_cmd = MRPC_OSA_STATUS_QUERY_GEN6;
 		osa_status_query_in.stack_id = stack_id;
 
 		ret = switchtec_cmd(dev, MRPC_ORDERED_SET_ANALYZER,
