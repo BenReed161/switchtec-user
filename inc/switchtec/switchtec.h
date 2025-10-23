@@ -1056,7 +1056,7 @@ struct switchtec_rtc {
 };
 
 int switchtec_rtc_counter(struct switchtec_dev *dev, uint64_t *rtc_counter, 
-			  int opertaion);
+			  int operation);
 
 /******** GPIO Management ********/
 

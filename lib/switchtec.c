@@ -2481,8 +2481,7 @@ int switchtec_rtc_counter(struct switchtec_dev *dev, uint64_t *rtc_counter,
 	if (ret)
 		return ret;
 	
-	if (operation == MRPC_RTC_SET)
-		*rtc_counter = out.rtc_counter;
+	*rtc_counter = out.rtc_counter;
 
 	return 0;
 	
