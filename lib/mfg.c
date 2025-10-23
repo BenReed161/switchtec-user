@@ -560,7 +560,7 @@ static int mailbox_to_file_gen5(struct switchtec_dev *dev, int fd)
  */
 int switchtec_mailbox_to_file(struct switchtec_dev *dev, int fd)
 {
-	if (switchtec_is_gen5(dev))
+	if (switchtec_is_gen5(dev) || switchtec_is_gen6(dev))
 		return mailbox_to_file_gen5(dev, fd);
 	else
 		return mailbox_to_file(dev, fd);

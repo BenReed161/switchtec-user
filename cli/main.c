@@ -1150,6 +1150,7 @@ static int log_parse(int argc, char **argv)
 		{"GEN3", SWITCHTEC_GEN3, "GEN3"},
 		{"GEN4", SWITCHTEC_GEN4, "GEN4"},
 		{"GEN5", SWITCHTEC_GEN5, "GEN5"},
+		{"GEN6", SWITCHTEC_GEN6, "GEN6"},
 		{"UNKNOWN", SWITCHTEC_GEN_UNKNOWN, "UNKNOWN"},
 		{}
 	};
