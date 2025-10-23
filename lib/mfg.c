@@ -479,7 +479,7 @@ static int security_config_get_gen5(struct switchtec_dev *dev,
 int switchtec_security_config_get(struct switchtec_dev *dev,
 				  struct switchtec_security_cfg_state *state)
 {
-	if (switchtec_is_gen5(dev))
+	if (switchtec_is_gen5(dev) || switchtec_is_gen6(dev))
 		return security_config_get_gen5(dev, state);
 	else
 		return security_config_get(dev, state);
@@ -1739,7 +1739,7 @@ static int sn_ver_get_gen5(struct switchtec_dev *dev,
 int switchtec_sn_ver_get(struct switchtec_dev *dev,
 			 struct switchtec_sn_ver_info *info)
 {
-	if (switchtec_is_gen5(dev))
+	if (switchtec_is_gen5(dev) || switchtec_is_gen6(dev))
 		return sn_ver_get_gen5(dev, info);
 	else
 		return sn_ver_get_gen4(dev, info);
