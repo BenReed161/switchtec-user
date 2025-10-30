@@ -1658,6 +1658,7 @@ static int loopback(int argc, char **argv)
 		int enable_parallel;
 		int enable_external;
 		int enable_ltssm;
+		int enable_pipe;
 		int speed;
 	} cfg = {
 		.port_id = -1,
@@ -1680,6 +1681,8 @@ static int loopback(int argc, char **argv)
 		 no_argument, "Enable parallel datapath loopback mode in SERDES digital layer (Gen 5)"},
 		{"external", 'e', "", CFG_NONE, &cfg.enable_external, 
 		 no_argument, "Enable external datapath loopback mode in physical layer (Gen 5)"},
+		{"pipe", 'c', "", CFG_NONE, &cfg.enable_pipe,
+		 no_argument, "Enable parallel loopback within Controller (PIPE Tx->Rx) (Gen 6)"},
 		{"speed", 's', "GEN", CFG_CHOICES, &cfg.speed, 
 		 required_argument, "LTSSM Speed (if enabling the LTSSM loopback mode), default: GEN4",
 		 .choices = loopback_ltssm_speeds},
@@ -1700,7 +1703,7 @@ static int loopback(int argc, char **argv)
 
 	if (cfg.disable && (cfg.enable_rx_to_tx || cfg.enable_tx_to_rx ||
 			    cfg.enable_ltssm || cfg.enable_external ||
-			    cfg.enable_parallel)) {
+			    cfg.enable_parallel || cfg.enable_pipe)) {
 		fprintf(stderr,
 			"Must not specify -d / --disable with an enable flag\n");
 		return -1;
@@ -1711,13 +1714,16 @@ static int loopback(int argc, char **argv)
 		return ret;
 
 	if (cfg.disable || cfg.enable_rx_to_tx || cfg.enable_tx_to_rx ||
-	    cfg.enable_ltssm || cfg.enable_external || cfg.enable_parallel) {
+	    cfg.enable_ltssm || cfg.enable_external || cfg.enable_parallel ||
+	    cfg.enable_pipe) {
 		if (cfg.enable_rx_to_tx)
 			enable |= SWITCHTEC_DIAG_LOOPBACK_RX_TO_TX;
 		if (cfg.enable_tx_to_rx)
 			enable |= SWITCHTEC_DIAG_LOOPBACK_TX_TO_RX;
 		if (cfg.enable_ltssm)
 			enable |= SWITCHTEC_DIAG_LOOPBACK_LTSSM;
+		if (cfg.enable_pipe)
+			enable |= SWITCHTEC_DIAG_LOOPBACK_PIPE;
 
 		if (switchtec_is_gen5(cfg.dev)) {
 			if (cfg.enable_rx_to_tx || cfg.enable_tx_to_rx) {
@@ -1727,7 +1733,8 @@ static int loopback(int argc, char **argv)
 		}
 		ret = switchtec_diag_loopback_set(cfg.dev, cfg.port_id, enable,
 						  cfg.enable_parallel, 
-						  cfg.enable_external, 
+						  cfg.enable_external,
+						  cfg.enable_pipe,
 						  cfg.enable_ltssm, cfg.speed);
 		if (ret) {
 			switchtec_perror("loopback_set");

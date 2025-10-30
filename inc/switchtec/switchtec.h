@@ -1455,6 +1455,7 @@ enum switchtec_diag_loopback_enable {
 	SWITCHTEC_DIAG_LOOPBACK_RX_TO_TX = 1 << 0,
 	SWITCHTEC_DIAG_LOOPBACK_TX_TO_RX = 1 << 1,
 	SWITCHTEC_DIAG_LOOPBACK_LTSSM = 1 << 2,
+	SWITCHTEC_DIAG_LOOPBACK_PIPE = 1 << 3,
 };
 
 enum switchtec_diag_pattern {
@@ -1543,6 +1544,7 @@ int switchtec_diag_eye_cancel(struct switchtec_dev *dev);
 int switchtec_diag_loopback_set(struct switchtec_dev *dev, int port_id, 
 				int enable, int enable_parallel, 
 				int enable_external, int enable_ltssm,
+				int enable_pipe,
 				enum switchtec_diag_ltssm_speed ltssm_speed);
 int switchtec_diag_loopback_get(struct switchtec_dev *dev, int port_id,
 				int *enabled, 
