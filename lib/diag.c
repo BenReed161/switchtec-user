@@ -427,12 +427,11 @@ int switchtec_diag_eye_cancel(struct switchtec_dev *dev)
 	return ret;
 }
 
-static int switchtec_diag_loopback_set_gen5(struct switchtec_dev *dev,
-					    int port_id, int enable_parallel,
-					    int enable_external,
-					    int enable_ltssm,
-					    enum switchtec_diag_ltssm_speed
-					    ltssm_speed)
+static int switchtec_diag_loopback_set_gen56(struct switchtec_dev *dev,
+					int port_id, int enable_parallel,
+					int enable_external,
+					int enable_ltssm, int enable_pipe,
+					enum switchtec_diag_ltssm_speed	ltssm_speed)
 {
 	struct switchtec_diag_loopback_in int_in = {
 		.sub_cmd = MRPC_LOOPBACK_SET_INT_LOOPBACK,
@@ -467,6 +466,12 @@ static int switchtec_diag_loopback_set_gen5(struct switchtec_dev *dev,
 			if (ret)
 				return ret;
 		}
+		int_in.type = DIAG_LOOPBACK_PIPE_DATAPATH;
+		int_in.enable = enable_pipe;
+		ret = switchtec_cmd(dev, MRPC_INT_LOOPBACK, &int_in,
+				    sizeof(int_in), NULL, 0);
+		if (ret)
+			return ret;
 
 		ltssm_in.enable = enable_ltssm;
 		ret = switchtec_cmd(dev, MRPC_INT_LOOPBACK, &ltssm_in,
@@ -534,15 +539,14 @@ static int switchtec_diag_loopback_set_gen4(struct switchtec_dev *dev,
 int switchtec_diag_loopback_set(struct switchtec_dev *dev, int port_id,
 				int enable, int enable_parallel,
 				int enable_external, int enable_ltssm,
+				int enable_pipe,
 				enum switchtec_diag_ltssm_speed ltssm_speed)
 {
 	int ret = 0;
 	if (switchtec_is_gen5(dev)) {
-		ret = switchtec_diag_loopback_set_gen5(dev, port_id,
-						       enable_parallel,
-						       enable_external,
-						       enable_ltssm,
-						       ltssm_speed);
+		ret = switchtec_diag_loopback_set_gen56(dev, port_id, enable_parallel,
+							enable_external, enable_ltssm,
+							enable_pipe, ltssm_speed);
 		if (ret)
 			return ret;
 	}
