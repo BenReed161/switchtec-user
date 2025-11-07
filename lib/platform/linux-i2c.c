@@ -66,6 +66,8 @@ struct switchtec_i2c {
 #define GAS_TWI_MRPC_ERR  0x20
 #define DATA_TAIL_BYTE_COUNT  2
 
+#define MRPC_FW_PART_CMD 0x2B
+
 #define to_switchtec_i2c(d)  \
 	((struct switchtec_i2c *) \
 	 ((char *)d - offsetof(struct switchtec_i2c, dev)))
@@ -376,9 +378,20 @@ static void i2c_gas_write(struct switchtec_dev *dev, void __gas *dest,
 	uint8_t status;
 	uint8_t retry_count = 0;
 
+	uint32_t cmd_id = *(uint32_t*)src;
+
 	do {
 		tag = get_tag(idev);
 		i2c_gas_data_write(dev, dest, src, n, tag);
+		/* 
+		 * Increase delay as a workaround for an issue observed with the 
+		 * SEEPROM part info sub-cmd 0x2 using the same TWI bus as the Firmware.
+		 * This causes a corruption in the bus. Only occurs during BL2 phase.
+		 * Only check during the BL2 phase and when the command ID is the get 
+		 * part info command (0x2B)
+		 */
+		if (dev->boot_phase == SWITCHTEC_BOOT_PHASE_BL2 && cmd_id == MRPC_FW_PART_CMD)
+			usleep(200000);
 		status = i2c_gas_write_status_get(dev, tag);
 		if (status == 0 || status == GAS_TWI_MRPC_ERR)
 			break;
