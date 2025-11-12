@@ -1590,6 +1590,7 @@ static const struct argconfig_choice loopback_ltssm_speeds[] = {
 	{"GEN3", SWITCHTEC_DIAG_LTSSM_GEN3, "GEN3 LTSSM Speed"},
 	{"GEN4", SWITCHTEC_DIAG_LTSSM_GEN4, "GEN4 LTSSM Speed"},
 	{"GEN5", SWITCHTEC_DIAG_LTSSM_GEN5, "GEN5 LTSSM Speed"},
+	{"GEN6", SWITCHTEC_DIAG_LTSSM_GEN6, "GEN6 LTSSM Speed"},
 	{}
 };
 
