@@ -182,12 +182,14 @@ static int get_configs(struct switchtec_dev *dev,
 	return ret;
 }
 
-static int get_configs_gen5(struct switchtec_dev *dev,
+static int get_configs_gen56(struct switchtec_dev *dev,
 			    struct get_cfgs_reply_gen5 *cfgs)
 {
 	uint32_t subcmd = 0;
 
 	return switchtec_mfg_cmd(dev,
+				 switchtec_is_gen6(dev) 
+				 ? MRPC_SECURITY_CONFIG_GET_GEN6 :
 				 MRPC_SECURITY_CONFIG_GET_GEN5,
 				 &subcmd, sizeof(subcmd),
 				 cfgs, sizeof(struct get_cfgs_reply_gen5));
@@ -379,7 +381,7 @@ static int security_config_get_gen5(struct switchtec_dev *dev,
 	struct get_cfgs_reply_gen5 reply;
 	int attn_mode;
 
-	ret = get_configs_gen5(dev, &reply);
+	ret = get_configs_gen56(dev, &reply);
 	if (ret)
 		return ret;
 
@@ -675,7 +677,7 @@ static int security_config_set_gen5(struct switchtec_dev *dev,
 	int spi_clk;
 	uint8_t cmd_buf[64]={};
 
-	ret = get_configs_gen5(dev, &reply);
+	ret = get_configs_gen56(dev, &reply);
 	if (ret)
 		return ret;
 
@@ -1284,7 +1286,7 @@ static int read_sec_cfg_file_gen5(struct switchtec_dev *dev,
 	int ret;
 	int attest_mode;
 
-	ret = get_configs_gen5(dev, &reply);
+	ret = get_configs_gen56(dev, &reply);
 	if (ret)
 		return ret;
 
