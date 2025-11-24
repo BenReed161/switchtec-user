@@ -2297,7 +2297,7 @@ int switchtec_osa_dump_conf(struct switchtec_dev *dev, int stack_id)
 			sprintf(lane, "%d", i);
 		else
 			sprintf(lane, "%d,", i);
-		printf("%s", (osa_dmp_out.os_type_trig_lane_mask >> i) & i ? lane : "");
+		printf("%s", (osa_dmp_out.os_type_trig_lane_mask >> i) & 1 ? lane : "");
 	}
 	printf("\n");
 
@@ -2322,7 +2322,7 @@ int switchtec_osa_dump_conf(struct switchtec_dev *dev, int stack_id)
 			sprintf(lane, "%d", i);
 		else
 			sprintf(lane, "%d,", i);
-		printf("%s", (osa_dmp_out.os_pat_trig_lane_mask >> i) & i ? lane : "");
+		printf("%s", (osa_dmp_out.os_pat_trig_lane_mask >> i) & 1 ? lane : "");
 	}
 	printf("\n");
 
@@ -2357,7 +2357,7 @@ int switchtec_osa_dump_conf(struct switchtec_dev *dev, int stack_id)
 			sprintf(lane, "%d", i);
 		else
 			sprintf(lane, "%d,", i);
-		printf("%s", (osa_dmp_out.capture_lane_mask >> i) & i ? lane : "");
+		printf("%s", (osa_dmp_out.capture_lane_mask >> i) & 1 ? lane : "");
 	}
 	printf("\n");
 
