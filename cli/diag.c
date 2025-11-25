@@ -2258,7 +2258,8 @@ static int rcvr_extended(int argc, char **argv)
 static int refclk(int argc, char **argv)
 {
 	int ret;
-
+	uint8_t stack_info[SWITCHTEC_MAX_STACKS];
+	
 	static struct {
 		struct switchtec_dev *dev;
 		int stack_id;
@@ -2309,7 +2310,6 @@ static int refclk(int argc, char **argv)
 	       cfg.enable ? "Enabled" : "Disabled", cfg.stack_id);
 	
 print_stack_info:
-	uint8_t stack_info[SWITCHTEC_MAX_STACKS];
 	printf("REFCLK Status:\n");
 	ret = switchtec_diag_refclk_status(cfg.dev, stack_info);
 	if (ret) {
