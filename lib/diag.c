@@ -1475,7 +1475,7 @@ static void switchtec_diag_ltssm_set_log_data(struct switchtec_diag_ltssm_log
  * @param[inout] log_count number of log entries
  * @param[out] log    A pointer to an array containing the log
  */
-static int switchtec_diag_ltssm_log_gen5(struct switchtec_dev *dev,
+static int switchtec_diag_ltssm_log_gen56(struct switchtec_dev *dev,
 				 int port, int *log_count,
 				 struct switchtec_diag_ltssm_log *log_data)
 {
@@ -1738,8 +1738,8 @@ int switchtec_diag_ltssm_log(struct switchtec_dev *dev,
 			    struct switchtec_diag_ltssm_log *log_data)
 {
 	int ret;
-	if (switchtec_is_gen5(dev))
-		ret = switchtec_diag_ltssm_log_gen5(dev, port, log_count, log_data);
+	if (switchtec_is_gen5(dev)  || switchtec_is_gen6(dev))
+		ret = switchtec_diag_ltssm_log_gen56(dev, port, log_count, log_data);
 	else
 		ret = switchtec_diag_ltssm_log_gen4(dev, port, log_count, log_data);
 	return ret;

@@ -35,6 +35,9 @@
 
 #define SWITCHTEC_SECURITY_SPI_RATE_MAX_NUM	16
 
+#define SWITCHTEC_UID_DWORD_S 	16
+#define SWITCHTEC_PSID_DWORD_S 	4
+
 struct switchtec_sn_ver_info {
 	uint32_t chip_serial;
 	uint32_t ver_km;
@@ -43,6 +46,11 @@ struct switchtec_sn_ver_info {
 	uint32_t ver_sec_unlock;
 	bool riot_ver_valid;
 	uint32_t ver_riot;
+	uint32_t *UID;
+	uint32_t *PSID0;
+	uint32_t PSID_UID_valid_flags;
+	uint32_t dbg_tok_sec_ver_rsvrd;
+	uint32_t kmt_sec_ver_rsvrd;
 };
 enum switchtec_debug_mode {
 	SWITCHTEC_DEBUG_MODE_ENABLED,

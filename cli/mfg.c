@@ -424,15 +424,54 @@ static int info(int argc, char **argv)
 		switchtec_perror("mfg info");
 		return ret;
 	}
-	printf("Chip Serial: \t\t\t\t0x%08x\n", sn_info.chip_serial);
-	printf("Key Manifest Secure Version: \t\t0x%08x\n", sn_info.ver_km);
-	if (sn_info.riot_ver_valid)
-		printf("RIOT Secure Version: \t\t\t0x%08x\n",
-		       sn_info.ver_riot);
-	printf("BL2 Secure Version: \t\t\t0x%08x\n", sn_info.ver_bl2);
-	printf("Main Secure Version: \t\t\t0x%08x\n", sn_info.ver_main);
-	printf("Secure Unlock Version: \t\t\t0x%08x\n", sn_info.ver_sec_unlock);
 
+	if (switchtec_is_gen6(cfg.dev)) {
+
+		char *status[4] = {"Unprogrammed", "Programmed", "Locked", "Revoked"};
+
+		printf("----------------- UID info --------------------------------\n");
+		printf("Device Unique ID: \t\t\t0x");
+		for (int i = 0; i < SWITCHTEC_UID_DWORD_S; i++) {
+			printf("%08X", *sn_info.UID);
+			sn_info.UID++;
+		}
+		printf("\n");
+		printf("Status: \t\t\t\t%s\n", status[(sn_info.PSID_UID_valid_flags >> 4) & 0x3]);
+		printf("Mask Read Mask Enable: \t\t\t0x%0x\n", (sn_info.PSID_UID_valid_flags >> 6) & 0x1);
+		printf("Read Mask Request Enable: \t\t0x%0x\n", (sn_info.PSID_UID_valid_flags >> 7) & 0x1);
+		printf("----------------- PSID info -------------------------------\n");
+		printf("Device PSID: \t\t\t\t0x");
+		for (int i = 0; i < SWITCHTEC_PSID_DWORD_S; i++) {
+			printf("%08X", *sn_info.PSID0);
+			sn_info.PSID0++;
+		}
+		printf("\n");
+		printf("Status: \t\t\t\t%s\n", status[(sn_info.PSID_UID_valid_flags) & 0x3]);
+		printf("Read Mask Enable: \t\t\t0x%0x\n", (sn_info.PSID_UID_valid_flags >> 2) & 0x1);
+		printf("Read Mask Request Enable: \t\t0x%0x\n", (sn_info.PSID_UID_valid_flags >> 3) & 0x1);
+		printf("----------------- Image info ------------------------------\n");
+		printf("BL2 Secure Version: \t\t\t0x%08x\n", sn_info.ver_bl2);
+		printf("Main Secure Version: \t\t\t0x%08x\n", sn_info.ver_main);
+		printf("Debug Token Secure Version: \t\t0x%08x\n", sn_info.dbg_tok_sec_ver_rsvrd);
+		printf("KMT Secure Version: \t\t\t0x%08x\n", sn_info.kmt_sec_ver_rsvrd);
+		free(sn_info.UID);
+		free(sn_info.PSID0);
+	}
+	else {
+		printf("Chip Serial: \t\t\t\t0x%08x\n", sn_info.chip_serial);
+		printf("Key Manifest Secure Version: \t\t0x%08x\n", sn_info.ver_km);
+		if (sn_info.riot_ver_valid)
+			printf("RIOT Secure Version: \t\t\t0x%08x\n",
+				sn_info.ver_riot);
+		printf("BL2 Secure Version: \t\t\t0x%08x\n", sn_info.ver_bl2);
+		printf("Main Secure Version: \t\t\t0x%08x\n", sn_info.ver_main);
+		printf("Secure Unlock Version: \t\t\t0x%08x\n", sn_info.ver_sec_unlock);
+	}
+
+	if (switchtec_is_gen6(cfg.dev) && (phase_id == SWITCHTEC_BOOT_PHASE_BL2 || phase_id == SWITCHTEC_BOOT_PHASE_FW)) {
+		printf("\nOther secure settings are only shown in the BL1 phase for Gen6 switchtec devices.\n\n");
+		return 0;
+	}
 	if (phase_id == SWITCHTEC_BOOT_PHASE_BL2) {
 		printf("\nOther secure settings are only shown in the BL1 or Main Firmware phase.\n\n");
 		return 0;
@@ -531,6 +570,11 @@ static int image_list(int argc, char **argv)
 
 	argconfig_parse(argc, argv, CMD_DESC_IMAGE_LIST, opts, &cfg, sizeof(cfg));
 
+	if(switchtec_is_gen6(cfg.dev)) {
+		fprintf(stderr, "This command is not supported on Gen6 switches\n");
+		return -1;
+	}
+
 	if (switchtec_boot_phase(cfg.dev) != SWITCHTEC_BOOT_PHASE_BL1) {
 		fprintf(stderr, "This command is only available in BL1!\n");
 		return -1;
@@ -585,6 +629,11 @@ static int image_select(int argc, char **argv)
 	};
 
 	argconfig_parse(argc, argv, CMD_DESC_IMAGE_SELECT, opts, &cfg, sizeof(cfg));
+
+	if (switchtec_is_gen6(cfg.dev)) {
+		fprintf(stderr, "This command is not supported on Gen6 switches\n");
+		return -1;
+	}
 
 	if (cfg.bl2 == SWITCHTEC_ACTIVE_INDEX_NOT_SET &&
 	    cfg.firmware == SWITCHTEC_ACTIVE_INDEX_NOT_SET &&
