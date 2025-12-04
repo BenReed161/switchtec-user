@@ -40,6 +40,33 @@
 #define SWITCHTEC_UID_DWORD_S 	16
 #define SWITCHTEC_PSID_DWORD_S 	4
 
+#define OTP_MULTI_DWORD_IMAGE_BIAK0			   656
+#define OTP_DWORD_0							   0
+#define OTP_DWORD_10 						   10
+
+#define OTP_DWORD_0_PRODUCT_SECSC_LSB          22
+#define OTP_DWORD_0_PRODUCT_SECSC_MSK          0x00400000
+
+#define OTP_DWORD_10_SMBUS_SMBRMRPCADDR_LSB    0
+#define OTP_DWORD_10_SMBUS_SMBRMRPCADDR_MSK    0x000003FF
+#define OTP_DWORD_10_SMBUS_SMBRIF_LSB          10
+#define OTP_DWORD_10_SMBUS_SMBRIF_MSK          0x00000C00
+#define OTP_DWORD_10_SMBUS_SMBRATYPE_LSB       12
+#define OTP_DWORD_10_SMBUS_SMBRATYPE_MSK       0x00003000
+#define OTP_DWORD_10_SMBUS_SMBROCPADDR_LSB     18
+#define OTP_DWORD_10_SMBUS_SMBROCPADDR_MSK     0x0FFC0000
+
+#define SECIRE_CFG_GET_I2C					   (0xD4>>1)
+#define SECURE_CFG_GET_OCP					   (0xD2>>1)
+
+#define SECURE_CFG_GET_I2C_PORT_MSK			   0x00000003
+#define SECURE_CFG_GET_I2C_PORT_LSB			   0x0000000A
+#define SECURE_CFG_GET_I2C_ADDR_MSK			   0x000003FF
+#define SECURE_CFG_GET_I2C_CMD_MAP_MSK		   0x00000FFF
+#define SECURE_CFG_GET_I2C_CMD_MAP_LSB		   0x0000000C
+#define SECURE_CFG_GET_I2C_RCVRY_INF_MSK	   0x0000C000
+#define SECURE_CFG_GET_I2C_RCVRY_ADDR_MSK	   0x000003FF
+
 struct switchtec_sn_ver_info {
 	uint32_t chip_serial;
 	uint32_t ver_km;
@@ -170,6 +197,7 @@ struct switchtec_security_cfg_state {
 	uint8_t public_key[SWITCHTEC_KMSK_NUM_MAX][SWITCHTEC_KMSK_LEN];
 
 	uint8_t secsc;
+	uint16_t i2c_rcvry_address_ocp;
     uint32_t otp_key_hash[SWITCHTEC_KMSK_NUM_GEN6][SWITCHTEC_KMSK_LEN_DWORDS];
 
 	bool otp_valid;
@@ -253,6 +281,12 @@ struct switchtec_security_spi_avail_rate {
 	float rates[SWITCHTEC_SECURITY_SPI_RATE_MAX_NUM];
 };
 
+struct sec_cfg_get_struct {
+    uint32_t subcmd;
+    uint32_t OTP_dword_offset;
+    uint32_t read_dwords;
+};
+
 int switchtec_sn_ver_get(struct switchtec_dev *dev,
 			 struct switchtec_sn_ver_info *info);
 int switchtec_security_config_get(struct switchtec_dev *dev,
@@ -295,5 +329,7 @@ int switchtec_read_uds_file(FILE *uds_file, struct switchtec_uds *uds);
 int
 switchtec_security_state_has_kmsk(struct switchtec_security_cfg_state *state,
 				  struct switchtec_kmsk *kmsk);
+int security_settings_get_gen6(struct switchtec_dev *dev,
+					struct switchtec_security_cfg_state *state);
 
 #endif // LIBSWITCHTEC_MFG_H

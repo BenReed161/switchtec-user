@@ -158,7 +158,7 @@ struct get_cfgs_reply_gen5 {
 
 struct get_cfgs_reply_gen6 {
 	uint16_t twi_recov_info;
-	uint16_t rsrvd1;
+	uint16_t twi_recov_addr;
 	uint16_t mrpc_cmd_map;
 	uint16_t rsrvd2;
 	uint32_t ap_offset;
@@ -528,11 +528,16 @@ static int security_config_get_gen6(struct switchtec_dev *dev,
 	ret = get_configs_gen6(dev, &reply);
 	if (ret)
 		return ret;
-	state->i2c_port = (reply.twi_recov_info >> 10) & 0x3;
-	state->i2c_addr = ((reply.twi_recov_info & 0x3FF) == 0) ? 
-						0xD4 : (reply.twi_recov_info & 0x3FF);
-	state->i2c_cmd_map = reply.mrpc_cmd_map & 0xFFF;
-	state->secsc = (reply.mrpc_cmd_map >> 12) & 0x1;
+	state->i2c_port = (reply.twi_recov_info >> SECURE_CFG_GET_I2C_PORT_LSB) 
+					& SECURE_CFG_GET_I2C_PORT_MSK;
+	state->i2c_addr = ((reply.twi_recov_info & SECURE_CFG_GET_I2C_ADDR_MSK) == 0) ? 
+					(SECIRE_CFG_GET_I2C) : (reply.twi_recov_info & SECURE_CFG_GET_I2C_ADDR_MSK);
+	state->i2c_cmd_map = reply.mrpc_cmd_map & SECURE_CFG_GET_I2C_CMD_MAP_MSK;
+	state->secsc = (reply.mrpc_cmd_map >> SECURE_CFG_GET_I2C_CMD_MAP_LSB) & 0x1;
+	state->i2c_rcvry_address_ocp = ((reply.twi_recov_info & SECURE_CFG_GET_I2C_RCVRY_INF_MSK) | 
+								(reply.twi_recov_addr & SECURE_CFG_GET_I2C_RCVRY_ADDR_MSK) ? (SECURE_CFG_GET_OCP) : 
+								((reply.twi_recov_info & SECURE_CFG_GET_I2C_RCVRY_INF_MSK) | 
+								(reply.twi_recov_addr & SECURE_CFG_GET_I2C_RCVRY_ADDR_MSK)));
 	memcpy(state->otp_key_hash, reply.otp_key_hash, 
 			SWITCHTEC_KMSK_NUM_GEN6 * SWITCHTEC_KMSK_LEN);
 
@@ -582,6 +587,66 @@ static int mailbox_to_file(struct switchtec_dev *dev, int fd)
 		if (ret < 0)
 			return ret;
 	} while (reply.num_remaining > 0);
+
+	return 0;
+}
+
+/*
+ * @brief Get secure boot settings in BL1 for gen6. 
+ * Outside of 
+ * @param[in]  dev	Switchtec device handle
+ * @param[out] state	Current secure boot settings
+ * @return 0 on success, error code on failure
+ * 
+ * Command ID cannot be accessed outside of BL1 phase. Use security_config_get_gen6 
+ * to access the secure settings during MainFW phase.
+*/
+int security_settings_get_gen6(struct switchtec_dev *dev,
+				struct switchtec_security_cfg_state *state)
+{
+	int ret;
+
+	struct sec_cfg_get_struct cmd = {};
+	uint32_t reply_otp[MRPC_MAX_DATA_LEN / sizeof(uint32_t)] = {};
+
+	/* get first 60dwords of OTP content */
+	cmd.subcmd = MRPC_GET_SECURE_OTP;
+	cmd.OTP_dword_offset = 0;
+	cmd.read_dwords = 60;
+
+	cmd.subcmd = MRPC_GET_SECURE_OTP;
+	ret = switchtec_mfg_cmd(dev,MRPC_SECURITY_CONFIG_GET_GEN6, &cmd, sizeof(cmd),
+				 			&reply_otp, cmd.read_dwords * sizeof(uint32_t));
+	if (ret)
+		return ret;
+	
+	state->i2c_cmd_map = (reply_otp[OTP_DWORD_10] & OTP_DWORD_10_SMBUS_SMBRMRPCADDR_MSK) 
+						  >> OTP_DWORD_10_SMBUS_SMBRMRPCADDR_LSB;
+	state->i2c_port = (reply_otp[OTP_DWORD_10] & OTP_DWORD_10_SMBUS_SMBRIF_MSK) 
+					   >> OTP_DWORD_10_SMBUS_SMBRIF_LSB;
+	state->i2c_addr = (reply_otp[OTP_DWORD_10] & OTP_DWORD_10_SMBUS_SMBRATYPE_MSK) 
+					   >> OTP_DWORD_10_SMBUS_SMBRATYPE_LSB;
+	state->i2c_rcvry_address_ocp = (reply_otp[OTP_DWORD_10] & OTP_DWORD_10_SMBUS_SMBROCPADDR_MSK) 
+									>> OTP_DWORD_10_SMBUS_SMBROCPADDR_LSB;
+	state->secsc = (reply_otp[OTP_DWORD_0] & OTP_DWORD_0_PRODUCT_SECSC_MSK) 
+					>> OTP_DWORD_0_PRODUCT_SECSC_LSB;
+
+	/* get 192 dwords of OTP content from offset 656 for keys*/
+	cmd.subcmd = MRPC_GET_SECURE_OTP;
+	cmd.OTP_dword_offset = OTP_MULTI_DWORD_IMAGE_BIAK0;
+	cmd.read_dwords = (SWITCHTEC_KMSK_NUM_GEN6 * SWITCHTEC_KMSK_LEN_DWORDS);
+
+	cmd.subcmd = MRPC_GET_SECURE_OTP;
+	ret = switchtec_mfg_cmd(dev, MRPC_SECURITY_CONFIG_GET_GEN6, &cmd, sizeof(cmd),
+				 			&reply_otp, cmd.read_dwords * sizeof(uint32_t));
+	if (ret)
+		return ret;
+
+	for (int i = 0; i < SWITCHTEC_KMSK_NUM_GEN6; i++) {
+		memcpy(state->otp_key_hash[i],
+			&reply_otp[i * SWITCHTEC_KMSK_LEN_DWORDS],
+			SWITCHTEC_KMSK_LEN_DWORDS * sizeof(uint32_t));
+	}
 
 	return 0;
 }

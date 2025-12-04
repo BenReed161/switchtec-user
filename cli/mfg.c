@@ -331,8 +331,9 @@ static void print_security_config(struct switchtec_security_cfg_state *state,
 static void print_security_config_gen6(struct switchtec_security_cfg_state *state)
 {
 	printf("----------------- Security Configuration ------------------\n");
-	printf("I2C Port: \t\t\t\t%d\n", state->i2c_port);
+	printf("I2C Bus: \t\t\t\t%d\n", state->i2c_port);
 	printf("I2C Address (7-bits): \t\t\t0x%02X\n", state->i2c_addr);
+	printf("I2C Address (7-bits) OCP: \t\t\t0x%02X\n", state->i2c_rcvry_address_ocp);
 	printf("I2C Command Map: \t\t\t0x%08X\n", state->i2c_cmd_map);
 	printf("Device SECSC: \t\t\t\t0x%01x\n", state->secsc);
 
@@ -497,8 +498,7 @@ static int info(int argc, char **argv)
 		printf("Main Secure Version: \t\t\t0x%08x\n", sn_info.ver_main);
 		printf("Debug Token Secure Version: \t\t0x%08x\n", sn_info.dbg_tok_sec_ver_rsvrd);
 		printf("KMT Secure Version: \t\t\t0x%08x\n", sn_info.kmt_sec_ver_rsvrd);
-	}
-	else {
+	} else {
 		printf("Chip Serial: \t\t\t\t0x%08x\n", sn_info.chip_serial);
 		printf("Key Manifest Secure Version: \t\t0x%08x\n", sn_info.ver_km);
 		if (sn_info.riot_ver_valid)
@@ -514,10 +514,18 @@ static int info(int argc, char **argv)
 		return 0;
 	}
 
-	ret = switchtec_security_config_get(cfg.dev, &state);
-	if (ret) {
-		switchtec_perror("mfg info");
-		return ret;
+	if (switchtec_is_gen6(cfg.dev) && (phase_id == SWITCHTEC_BOOT_PHASE_BL1)) {
+		ret = security_settings_get_gen6(cfg.dev, &state);
+		if (ret) {
+			switchtec_perror("mfg info");
+			return ret;
+		}
+	} else{
+		ret = switchtec_security_config_get(cfg.dev, &state);
+		if (ret) {
+			switchtec_perror("mfg info");
+			return ret;
+		}
 	}
 
 	if (cfg.verbose)  {
