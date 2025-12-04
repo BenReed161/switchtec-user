@@ -328,6 +328,49 @@ static void print_security_config(struct switchtec_security_cfg_state *state,
 	}
 }
 
+static void print_security_config_gen6(struct switchtec_security_cfg_state *state)
+{
+	printf("----------------- Security Configuration ------------------\n");
+	printf("I2C Port: \t\t\t\t%d\n", state->i2c_port);
+	printf("I2C Address (7-bits): \t\t\t0x%02X\n", state->i2c_addr);
+	printf("I2C Command Map: \t\t\t0x%08X\n", state->i2c_cmd_map);
+	printf("Device SECSC: \t\t\t\t0x%01x\n", state->secsc);
+
+	/* Print key hashes */
+	uint32_t *state_ptr = (uint32_t *)state;
+	uint32_t dw7 = state_ptr[7];  // read DWORD 7 for keyhashes
+	for (int key = 0; key < SWITCHTEC_KMSK_NUM_GEN6; key++) {
+
+		int shift = 4 + key * 2;      // Start at bit 4, each key uses 2 bits
+		uint32_t status = (dw7 >> shift) & 0x3;
+
+		printf("OTP Key%d Hash:\t\t\t\t", key + 1);
+
+		switch (status) {
+		case PROGRAMMED:
+			for (int j = 0; j < SWITCHTEC_KMSK_LEN_DWORDS; j++) {
+				if (j && j % 8 == 0)
+					printf("\n\t\t\t\t\t");
+				printf("%08x", be32toh(state->otp_key_hash[key][j]));
+			}
+			printf("\n");
+			break;
+
+		case REVOKED:
+			printf("Revoked\n");
+			break;
+
+		case UNPROGRAMMED:
+			printf("Available\n");
+			break;
+
+		default:
+			printf("Invalid\n");
+			break;
+		}
+	}
+}
+
 static void print_security_cfg_set(struct switchtec_security_cfg_set *set)
 {
 	int i;
@@ -454,8 +497,6 @@ static int info(int argc, char **argv)
 		printf("Main Secure Version: \t\t\t0x%08x\n", sn_info.ver_main);
 		printf("Debug Token Secure Version: \t\t0x%08x\n", sn_info.dbg_tok_sec_ver_rsvrd);
 		printf("KMT Secure Version: \t\t\t0x%08x\n", sn_info.kmt_sec_ver_rsvrd);
-		free(sn_info.UID);
-		free(sn_info.PSID0);
 	}
 	else {
 		printf("Chip Serial: \t\t\t\t0x%08x\n", sn_info.chip_serial);
@@ -468,10 +509,6 @@ static int info(int argc, char **argv)
 		printf("Secure Unlock Version: \t\t\t0x%08x\n", sn_info.ver_sec_unlock);
 	}
 
-	if (switchtec_is_gen6(cfg.dev) && (phase_id == SWITCHTEC_BOOT_PHASE_BL2 || phase_id == SWITCHTEC_BOOT_PHASE_FW)) {
-		printf("\nOther secure settings are only shown in the BL1 phase for Gen6 switchtec devices.\n\n");
-		return 0;
-	}
 	if (phase_id == SWITCHTEC_BOOT_PHASE_BL2) {
 		printf("\nOther secure settings are only shown in the BL1 or Main Firmware phase.\n\n");
 		return 0;
@@ -484,23 +521,29 @@ static int info(int argc, char **argv)
 	}
 
 	if (cfg.verbose)  {
-		if (!state.otp_valid) {
-			print_security_config(&state, false);
-			fprintf(stderr,
-				"\nAdditional (verbose) chip info is not available on this chip!\n\n");
-		} else if (switchtec_gen(cfg.dev) == SWITCHTEC_GEN4 &&
-			   phase_id != SWITCHTEC_BOOT_PHASE_FW) {
-			print_security_config(&state, false);
-			fprintf(stderr,
-				"\nAdditional (verbose) chip info is only available in the Main Firmware phase!\n\n");
-		} else {
-			print_security_config(&state, true);
+		if (switchtec_is_gen6(cfg.dev))
+			print_security_config_gen6(&state);
+		else {
+			if (!state.otp_valid) {
+				print_security_config(&state, false);
+				fprintf(stderr,
+					"\nAdditional (verbose) chip info is not available on this chip!\n\n");
+			} else if (switchtec_gen(cfg.dev) == SWITCHTEC_GEN4 &&
+				phase_id != SWITCHTEC_BOOT_PHASE_FW) {
+				print_security_config(&state, false);
+				fprintf(stderr,
+					"\nAdditional (verbose) chip info is only available in the Main Firmware phase!\n\n");
+			} else {
+				print_security_config(&state, true);
+			}
 		}
-
 		return 0;
 	}
 
-	print_security_config(&state, false);
+	if (switchtec_is_gen6(cfg.dev))
+		print_security_config_gen6(&state);
+	else
+		print_security_config(&state, false);
 
 	return 0;
 }

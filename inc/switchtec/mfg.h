@@ -32,6 +32,8 @@
 #define SWITCHTEC_UDS_LEN	32
 #define SWITCHTEC_KMSK_LEN	64
 #define SWITCHTEC_KMSK_NUM_MAX	10
+#define SWITCHTEC_KMSK_NUM_GEN6		12
+#define SWITCHTEC_KMSK_LEN_DWORDS	(SWITCHTEC_KMSK_LEN / 4)
 
 #define SWITCHTEC_SECURITY_SPI_RATE_MAX_NUM	16
 
@@ -167,12 +169,22 @@ struct switchtec_security_cfg_state {
 
 	uint8_t public_key[SWITCHTEC_KMSK_NUM_MAX][SWITCHTEC_KMSK_LEN];
 
+	uint8_t secsc;
+    uint32_t otp_key_hash[SWITCHTEC_KMSK_NUM_GEN6][SWITCHTEC_KMSK_LEN_DWORDS];
+
 	bool otp_valid;
 	bool use_otp_ext;
 	struct switchtec_security_cfg_otp_region otp;
 	struct switchtec_security_cfg_otp_region_ext otp_ext;
 
 	struct switchtec_attestation_state attn_state;
+};
+
+enum switchtec_otp_key_status {
+	UNPROGRAMMED = 0x00,
+	PROGRAMMED = 0x01,
+	REVOKED = 0x02,
+	INVALID = 0x03
 };
 
 struct switchtec_attestation_set {

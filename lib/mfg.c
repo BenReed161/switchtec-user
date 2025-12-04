@@ -156,57 +156,29 @@ struct get_cfgs_reply_gen5 {
 	uint8_t uds_data[32];
 };
 
-struct get_secure_cfgs_reply_gen6 {
-    // DW00
-	//TWI Recovery Address [0:11]
-	//TWI Recovery Bus [12:13]
-	//TWI Address Type [13:14]
-	//Reserved [14:15]
+struct get_cfgs_reply_gen6 {
 	uint16_t twi_recov_info;
 	uint16_t rsrvd1;
-	
-    // DW01
-	//MRPC command Map [0:11]
-	//Reserved [12:15]
 	uint16_t mrpc_cmd_map;
 	uint16_t rsrvd2;
-	
-    // DW02
-	//AP Offset (Reserved) [0:19]
-	//Reserved [20:31]
 	uint32_t ap_offset;
-	//I3C PID (bits 63:32) (Reserved)
-	//I3C PID (bits 31:0) (Reserved)
-	
-    // DW03 -4
 	uint64_t i3c_pid_reserved;
-	
-    // DW05
-    //I3C Recovery Address (Reserved), [16:31] I3C Bus (Reserved)
     uint8_t i3c_recovery_address_reserved;
     uint8_t i3c_bus_reserved;
 	uint16_t rsvrd3;
-
-    // DW06
     uint8_t algo_engine_disable_reserved;
     uint8_t bootrom_key_revoke_reserved;
     uint8_t boot_recovery_failover_disable;
     uint8_t token_disable_reserved;
-
-    // DW07
     uint8_t puf_ac_status_reserved;
     uint8_t puf_ac_read_mask_reserved;
     uint8_t puf_ac_read_mask_request_reserved;
     uint8_t otp_key_hash_status;
-
-    // DW08
     uint8_t otp_hash_key_read_mask;
     uint8_t otp_hash_key_read_mask_request;
     uint8_t hash_table_disable_reserved;
     uint8_t reserved2;
-
-    // DW09 to DW20
-    uint32_t otp_key_hash[12];
+    uint32_t otp_key_hash[SWITCHTEC_KMSK_NUM_GEN6][SWITCHTEC_KMSK_LEN_DWORDS];
 };
 
 static uint32_t get_dbg_unlock_id(struct switchtec_dev *dev)
@@ -245,7 +217,7 @@ static int get_configs(struct switchtec_dev *dev,
 	return ret;
 }
 
-static int get_configs_gen56(struct switchtec_dev *dev,
+static int get_configs_gen5(struct switchtec_dev *dev,
 			    struct get_cfgs_reply_gen5 *cfgs)
 {
 	uint32_t subcmd = 0;
@@ -256,6 +228,18 @@ static int get_configs_gen56(struct switchtec_dev *dev,
 				 MRPC_SECURITY_CONFIG_GET_GEN5,
 				 &subcmd, sizeof(subcmd),
 				 cfgs, sizeof(struct get_cfgs_reply_gen5));
+}
+
+static int get_configs_gen6(struct switchtec_dev *dev,
+			    struct get_cfgs_reply_gen6 *cfgs)
+{
+	uint32_t subcmd = 0;
+
+	return switchtec_mfg_cmd(dev,
+				 MRPC_SECURE_CONFIG_GET_GEN6,
+				 &subcmd, sizeof(subcmd),
+				 cfgs, sizeof(struct get_cfgs_reply_gen6));
+
 }
 
 int switchtec_security_spi_avail_rate_get(struct switchtec_dev *dev,
@@ -444,7 +428,7 @@ static int security_config_get_gen5(struct switchtec_dev *dev,
 	struct get_cfgs_reply_gen5 reply;
 	int attn_mode;
 
-	ret = get_configs_gen56(dev, &reply);
+	ret = get_configs_gen5(dev, &reply);
 	if (ret)
 		return ret;
 
@@ -535,6 +519,26 @@ static int security_config_get_gen5(struct switchtec_dev *dev,
 	return 0;
 }
 
+static int security_config_get_gen6(struct switchtec_dev *dev,
+				    struct switchtec_security_cfg_state *state)
+{
+	int ret;
+	struct get_cfgs_reply_gen6 reply;
+
+	ret = get_configs_gen6(dev, &reply);
+	if (ret)
+		return ret;
+	state->i2c_port = (reply.twi_recov_info >> 10) & 0x3;
+	state->i2c_addr = ((reply.twi_recov_info & 0x3FF) == 0) ? 
+						0xD4 : (reply.twi_recov_info & 0x3FF);
+	state->i2c_cmd_map = reply.mrpc_cmd_map & 0xFFF;
+	state->secsc = (reply.mrpc_cmd_map >> 12) & 0x1;
+	memcpy(state->otp_key_hash, reply.otp_key_hash, 
+			SWITCHTEC_KMSK_NUM_GEN6 * SWITCHTEC_KMSK_LEN);
+
+	return 0;
+}
+
 /**
  * @brief Get secure boot configurations
  * @param[in]  dev	Switchtec device handle
@@ -544,7 +548,9 @@ static int security_config_get_gen5(struct switchtec_dev *dev,
 int switchtec_security_config_get(struct switchtec_dev *dev,
 				  struct switchtec_security_cfg_state *state)
 {
-	if (switchtec_is_gen5(dev) || switchtec_is_gen6(dev))
+	if (switchtec_is_gen6(dev))
+		return security_config_get_gen6(dev, state);
+	if (switchtec_is_gen5(dev))
 		return security_config_get_gen5(dev, state);
 	else
 		return security_config_get(dev, state);
@@ -740,7 +746,7 @@ static int security_config_set_gen5(struct switchtec_dev *dev,
 	int spi_clk;
 	uint8_t cmd_buf[64]={};
 
-	ret = get_configs_gen56(dev, &reply);
+	ret = get_configs_gen5(dev, &reply);
 	if (ret)
 		return ret;
 
@@ -1343,7 +1349,7 @@ static int read_sec_cfg_file_gen5(struct switchtec_dev *dev,
 	int ret;
 	int attest_mode;
 
-	ret = get_configs_gen56(dev, &reply);
+	ret = get_configs_gen5(dev, &reply);
 	if (ret)
 		return ret;
 
