@@ -267,6 +267,36 @@ enum switchtec_fw_type {
 	SWITCHTEC_FW_TYPE_RIOT,
 };
 
+/* @brief
+*    Gen6 FW read FW-types
+*
+* @note
+*   These mrpc fw types are aligned to device fw types currently
+*   but that is not required and may diverge in the future.
+*   Intention is to keep the mrpc consistent over several generations
+*   of devices even if device fw types change.
+*/
+enum switchtec_fw_type_gen6 {
+	SWITCHTEC_IMG_PART_TYPE_MAP = 0,         /**< partition map partition */
+	SWITCHTEC_IMG_PART_TYPE_KMT = 1,         /**< key manifest table */
+	SWITCHTEC_IMG_PART_TYPE_BL2 = 2,         /**< bootloader 2 partition */
+	SWITCHTEC_IMG_PART_TYPE_DATA = 3,        /**< configuration file partition */
+	SWITCHTEC_IMG_PART_TYPE_FW = 4,          /**< main firmware image partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_5 = 5,      /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_CERT = 6,        /**< Cert partition */
+	SWITCHTEC_IMG_PART_TYPE_DEBUG_TOKEN = 7, /**< Debug token partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_8 = 8,      /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_9 = 9,      /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_10 = 10,    /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_11 = 11,    /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_12 = 12,    /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_13 = 13,    /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_14 = 14,    /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_15 = 15,    /**< reserved partition */
+
+	SWITCHTEC_IMG_PART_TYPE_NUM,     /**< Number of active partition names in partition map */
+};
+
 /**
  * @brief Information about a firmware image or partition
  */
@@ -409,6 +439,9 @@ _PURE enum switchtec_boot_phase
 switchtec_boot_phase(struct switchtec_dev *dev);
 int switchtec_set_pax_id(struct switchtec_dev *dev, int pax_id);
 int switchtec_echo(struct switchtec_dev *dev, uint32_t input, uint32_t *output);
+int switchtec_fw_img_get(struct switchtec_dev *dev, int fd, 
+						enum switchtec_fw_type_gen6 fw_type, int fw_slot, 
+						void (*progress_callback)(int cur, int tot));
 int switchtec_hard_reset(struct switchtec_dev *dev);
 int switchtec_status(struct switchtec_dev *dev,
 		     struct switchtec_status **status);

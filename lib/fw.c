@@ -198,6 +198,21 @@ struct switchtec_fw_image_header_gen3 {
 	uint32_t image_crc;
 };
 
+typedef enum
+{
+    MRPC_FW_IMG_GET_CMD_START = 0,
+    MRPC_FW_IMG_GET_CMD_NEXT = 1,
+
+    MRPC_FW_IMG_GET_CMD_MAX
+} mrpc_fw_img_get_cmd_e;
+
+struct cmd_fwget {
+	uint8_t subcmd;
+	uint8_t fw_type;
+	uint8_t fw_slot;
+	uint8_t f_from_start;
+};
+
 static uint32_t get_fw_tx_id(struct switchtec_dev *dev)
 {
 	if (switchtec_is_gen6(dev))
@@ -331,6 +346,97 @@ int switchtec_fw_set_redundant_flag (struct switchtec_dev *dev, int keyman,
 		ret += set_redundant(dev, SWITCHTEC_PART_TYPE_FW, set);
 
 	return ret;
+}
+
+/**
+ * @brief Download fwimg file from device
+ * @brief Write a firmware file to the switchtec device
+ * @param[in] dev		Switchtec device handle
+ * @param[in] fd		File descriptor for the image file to write
+ * @param[in] fw_type		Firmware type to download
+ * @param[in] fw_slot		Firmware slot to download
+ * @param[in] progress_callback If not NULL, this function will be called to
+ * 	indicate the progress.
+ * @return 0 on success, error code on failure
+ *
+ * The fw_img_get command will download the firmware image corresponding to fw type and slot 
+ * from the device to the file descriptor provided.
+ */
+int switchtec_fw_img_get(struct switchtec_dev *dev, int fd, 
+						enum switchtec_fw_type_gen6 fw_type, int fw_slot, 
+						void (*progress_callback)(int cur, int tot))
+{
+  	struct cmd_fwget cmd = {0};
+
+	struct fw_img_get_resp_t {
+		uint8_t status;
+		uint8_t fw_type;
+		uint8_t fw_slot;
+		uint8_t reserved;
+		uint32_t total_len;
+		uint32_t offset;
+		uint32_t chunk_len;
+		uint32_t *data;
+	};
+
+	uint8_t resp[MRPC_MAX_DATA_LEN] ={};
+	struct fw_img_get_resp_t *fw_img_get_resp = (struct fw_img_get_resp_t *)resp;
+	int ret;
+
+	/* erase existing file */
+	if (ftruncate(fd, 0) == -1) {
+		perror("ftruncate");
+		return 1;
+	}
+
+	cmd.subcmd = 0;
+	cmd.fw_type = fw_type;
+	cmd.fw_slot = fw_slot;
+	cmd.f_from_start = MRPC_FW_IMG_GET_CMD_START;
+
+	ret = switchtec_cmd(dev, MRPC_FW_IMG_GET, &cmd, sizeof(cmd),
+		resp, sizeof(resp));
+
+	if(ret){
+		printf("Error during FW image get\n");
+		return ret;
+	}
+
+	size_t written = write(fd, (void*)(&fw_img_get_resp->data), fw_img_get_resp->chunk_len);
+	if (written != fw_img_get_resp->chunk_len) {
+		perror("Error writing to file");
+		return 1;
+	}
+
+	if (progress_callback)
+		progress_callback(fw_img_get_resp->offset, fw_img_get_resp->total_len);
+
+	do {
+		cmd.subcmd = 0;
+		cmd.fw_type = fw_type;
+		cmd.fw_slot = fw_slot;
+		cmd.f_from_start = MRPC_FW_IMG_GET_CMD_NEXT;
+
+		ret = switchtec_cmd(dev, MRPC_FW_IMG_GET, &cmd, sizeof(cmd),
+			resp, sizeof(resp));
+
+		if(ret){
+			printf("Error during FW image get\n");
+			return ret;
+		}
+
+		size_t written = write(fd, (void*)(&fw_img_get_resp->data), fw_img_get_resp->chunk_len);
+		if (written != fw_img_get_resp->chunk_len){
+			perror("Error writing to file");
+			return 1;
+		}
+
+		if (progress_callback)
+			progress_callback(fw_img_get_resp->offset, fw_img_get_resp->total_len);
+
+	} while((fw_img_get_resp->offset + fw_img_get_resp->chunk_len) < fw_img_get_resp->total_len);
+
+	return 0;
 }
 
 /**
