@@ -159,6 +159,11 @@ static int ltssm_log(int argc, char **argv) {
 	argconfig_parse(argc, argv, CMD_DESC_LTSSM_LOG, opts, &cfg,
 			sizeof(cfg));
 
+	if (cfg.port_id == -1) {
+		fprintf (stderr, "Phyical port ID must be specified\n");
+		return 0;
+	}
+
 	int log_count = 512;
 	if (switchtec_is_gen4(cfg.dev))
 		log_count = 128;
@@ -184,15 +189,27 @@ static int ltssm_log(int argc, char **argv) {
 			switchtec_perror("ltssm_log");
 			return ret;
 		}
-
 		printf("LTSSM Log for Physical Port %d (autowrap ON)\n\n", port);
-		printf("Idx\tDelta Time\tPCIe Rate\tState\n");
-		for(i = 0; i < log_count ; i++) {
-			printf("%3d\t", i);
-			printf("%09x\t", output[i].timestamp);
-			printf("%.1fG\t\t", output[i].link_rate);
-			printf("%s\n", switchtec_ltssm_str(output[i].link_state, 
-							   1, cfg.dev));
+
+		if (switchtec_is_gen6(cfg.dev)) {
+			printf("Idx\tDelta Time\tPCIe Rate\tLink Width\tState\n");
+			for(i = 0; i < log_count ; i++) {
+				printf("%3d\t", i);
+				printf("%09x\t", output[i].timestamp);
+				printf("%.1fG\t\t", output[i].link_rate);
+				printf("x%d\t\t", output[i].link_width);
+				printf("%s\n", switchtec_ltssm_str(output[i].link_state,
+								1, cfg.dev));
+			}
+		} else {
+			printf("Idx\tDelta Time\tPCIe Rate\tState\n");
+			for(i = 0; i < log_count ; i++) {
+				printf("%3d\t", i);
+				printf("%09x\t", output[i].timestamp);
+				printf("%.1fG\t\t", output[i].link_rate);
+				printf("%s\n", switchtec_ltssm_str(output[i].link_state,
+								1, cfg.dev));
+			}
 		}
 	}
 

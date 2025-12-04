@@ -929,10 +929,55 @@ static inline const char *switchtec_ltssm_str_gen5(int ltssm, int show_minor)
 	}
 }
 
+static inline const char *switchtec_ltssm_str_gen6(int ltssm_major)
+{
+	switch(ltssm_major) {
+	case 0x00: return "DETECT_QUIET";
+	case 0x01: return "DETECT_ACTIVE";
+	case 0x02: return "POLL_ACTIVE";
+	case 0x03: return "POLL_COMPLIANCE";
+	case 0x04: return "POLL_CONFIG";
+	case 0x05: return "PRE_DETECT_QUIET";
+	case 0x06: return "DETECT_WAIT";
+	case 0x07: return "CFG_LINKWD_START";
+	case 0x08: return "CFG_LINKWD_ACEPT";
+	case 0x09: return "CFG_LANENUM_WAI";
+	case 0x0A: return "CFG_LANENUM_ACEPT";
+	case 0x0B: return "CFG_COMPLETE";
+	case 0x0C: return "CFG_IDLE";
+	case 0x0D: return "RCVRY_LOCK";
+	case 0x0E: return "RCVRY_SPEED";
+	case 0x0F: return "RCVRY_RCVRCFG";
+	case 0x10: return "RCVRY_IDLE";
+	case 0x11: return "L0";
+	case 0x12: return "L0S";
+	case 0x13: return "L123_SEND_EIDLE";
+	case 0x14: return "L1_IDLE";
+	case 0x15: return "L2_IDLE";
+	case 0x16: return "L2_WAKE";
+	case 0x17: return "DISABLED_ENTRY";
+	case 0x18: return "DISABLED_IDLE";
+	case 0x19: return "DISABLED";
+	case 0x1A: return "LPBK_ENTRY";
+	case 0x1B: return "LPBK_ACTIVE";
+	case 0x1C: return "LPBK_EXIT";
+	case 0x1D: return "LPBK_EXIT_TIMEOUT";
+	case 0x1E: return "HOT_RESET_ENTRY";
+	case 0x1F: return "HOT_RESET";
+	case 0x20: return "RCVRY_EQ0";
+	case 0x21: return "RCVRY_EQ1";
+	case 0x22: return "RCVRY_EQ2";
+	case 0x23: return "RCVRY_EQ3";
+	default:   return "UNKNOWN";
+	}
+}
+
 static inline const char *switchtec_ltssm_str(int ltssm, int show_minor,
 					      struct switchtec_dev *dev)
 {
-	if(switchtec_is_gen5(dev))
+	if (switchtec_is_gen6(dev))
+		return switchtec_ltssm_str_gen6(ltssm);
+	else if(switchtec_is_gen5(dev))
 		return switchtec_ltssm_str_gen5(ltssm, show_minor);
 	else
 		return switchtec_ltssm_str_gen4(ltssm, show_minor);
@@ -1570,6 +1615,10 @@ struct switchtec_diag_ltssm_log {
 	unsigned int timestamp;
 	float link_rate;
 	int link_state;
+	/* Gen 6 stucture variables */
+	int link_width;
+	int tx_minor_state;
+	int rx_minor_state;
 };
 
 int switchtec_diag_cross_hair_enable(struct switchtec_dev *dev, int lane_id);
