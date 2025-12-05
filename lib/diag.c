@@ -2049,7 +2049,18 @@ int switchtec_osa_capture_data(struct switchtec_dev *dev, int stack_id,
 	osa_data_read_out.entries_remaining = osa_data_entries_out.entries_remaining;
 	osa_data_read_out.next_entry = osa_data_entries_out.next_entry;
 
+	int total_dword = 0;
 	int total_entries = 0;
+	int curr_entry_dword = 0;
+	char osa_data[100] = "";
+	char buffer[50] = "";
+	uint64_t timestamp;
+	uint32_t timestamp_lower, timestamp_upper, counter;
+	uint8_t link_rate, trigger, os_droppped;
+
+	char *link_rate_str[5] = {"Gen1", "Gen2", "Gen3", "Gen4", "Gen5"};
+
+	printf("Entry\tTimestamp\tLink Rate\tCounter\t\tTrigger Indication\tOS Dropped?\tOSA Data\n");
 	while (osa_data_read_out.entries_remaining != 0) {
 		osa_data_read_in.num_entries = osa_data_read_out.entries_remaining;
 		osa_data_read_in.start_entry = osa_data_read_out.next_entry;
@@ -2060,9 +2071,37 @@ int switchtec_osa_capture_data(struct switchtec_dev *dev, int stack_id,
 		if (ret) {
 			return -1;
 		}
-		for (int i = total_entries; i < total_entries + (osa_data_read_out.entries_read * 6); i++)
-			printf("0x%08x\n", osa_data_read_out.entry_dwords[i]);
-		total_entries += osa_data_read_out.entries_read;
+		for (int i = total_dword; i < total_dword + (osa_data_read_out.entries_read * 6); i++) {
+			if (curr_entry_dword < 4) {
+				snprintf(buffer, sizeof(buffer), "0x%08x ", osa_data_read_out.entry_dwords[i]);
+				strncat(osa_data, buffer, sizeof(osa_data) - strlen(osa_data) - 1);
+			} else if (curr_entry_dword == 4) {
+				timestamp_lower = (osa_data_read_out.entry_dwords[i] >> 22) & 0x3FF;
+				timestamp_upper = (osa_data_read_out.entry_dwords[i+1] & 0x1A);
+				timestamp = timestamp_upper | timestamp_lower;
+				
+				link_rate = osa_data_read_out.entry_dwords[i] & 0x3;
+				counter = (osa_data_read_out.entry_dwords[i] >> 3) & 0x12;
+				trigger	= (osa_data_read_out.entry_dwords[i+1] >> 28) & 0x1;
+				os_droppped = (osa_data_read_out.entry_dwords[i+1] >> 29) & 0x1;
+				
+				printf("%d\t", total_entries);
+				printf("%ld\t\t", timestamp);
+				printf("%s\t\t", link_rate_str[link_rate]);
+				printf("%d\t\t", counter);
+				printf("%s\t\t", trigger ? "Pre-Trigger" : "Post-Trigger");
+				printf("%s\t\t", os_droppped ? "Yes" : "No");
+				printf("%s\n", osa_data);
+				osa_data[0] = '\0';
+				buffer[0] = '\0';
+				total_entries++;
+			}
+			curr_entry_dword++;
+			if (i != 0 && i % 5 == 0) {
+				curr_entry_dword = 0;
+			}
+		}
+		total_dword += osa_data_read_out.entries_read;
 	}
 
 	return ret;
