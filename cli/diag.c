@@ -3012,7 +3012,7 @@ static int osa_capture_contol(int argc, char **argv)
 		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x"},
 		{"direction", 'd', "DIRECTION", CFG_STRING, &cfg.direction, 
 		required_argument,
-		"3 bit mask for the direction, 1 enables the correisponding direction. "\
+		"2 bit mask for the direction, 1 enables the correisponding direction. "\
 		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x\nBit 0 : tx\nBit 1 : rx"},
 		{"drop_single_os", 'o', "", CFG_NONE, &cfg.drop_single_os, 
 		no_argument, 
@@ -3045,9 +3045,6 @@ static int osa_capture_contol(int argc, char **argv)
 	if (cfg.post_trig_entries && cfg.snapshot_mode) {
 		fprintf(stderr, "Cannot enable snapshot mode and set the number of post trigger entries.\n");
 		fprintf(stderr, "Snapshot mode --snapshot_mode -s enables capturing until the RAM is full, --post_trig_entries -p sets a specified number of entries to capture.\n");
-		return -1;
-	} else if (cfg.post_trig_entries == 0 && cfg.snapshot_mode == 0) {
-		fprintf(stderr, "Must specify a number of OS entries to capture.\n");
 		return -1;
 	}
 
