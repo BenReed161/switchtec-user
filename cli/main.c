@@ -1754,7 +1754,7 @@ static int gpio(int argc, char **argv)
 			return 1;
 		}
 		printf("Polarity configuration of GPIO logical pin %d is %s\n", 
-		       cfg.log_pin_id, polarity ? "Non-Inverted" : "Inverted");
+		       cfg.log_pin_id, polarity ? "Inverted" : "Non-Inverted");
 	} else if (cfg.en_gpio_int) {
 		ret = switchtec_en_dis_interrupt(cfg.dev, cfg.log_pin_id, 
 						 cfg.en_gpio_int);
