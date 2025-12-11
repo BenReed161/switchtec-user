@@ -153,6 +153,40 @@ struct switchtec_fw_metadata_gen5 {
 	uint32_t header_crc;
 };
 
+struct switchtec_fw_metadata_gen6 {
+	char magic[4];
+	char sub_magic[4];
+	uint32_t hdr_version;
+	uint32_t secure_version;
+	uint32_t header_len;
+	uint32_t metadata_len;
+	uint32_t image_len;
+	uint32_t type;
+	uint8_t fw_id;
+	uint8_t rsvd[3];
+	uint32_t version;
+	uint32_t sequence;
+	uint32_t reserved1;
+	uint8_t date_str[8];
+	uint8_t time_str[8];
+	uint8_t img_str[16];
+	uint8_t rsvd1[4];
+	uint32_t image_crc;
+	uint8_t public_key_modulus[512];
+	uint8_t public_key_exponent[4];
+	uint8_t uart_port;
+	uint8_t uart_rate;
+	uint8_t bist_enable;
+	uint8_t bist_gpio_pin_cfg;
+	uint8_t bist_gpio_level_cfg;
+	uint8_t rollback_enable;
+	uint8_t rsvd2[2];
+	uint32_t xml_version;
+	uint32_t relocatable_img_len;
+	uint32_t link_addr;
+	uint32_t header_crc;
+};
+
 struct switchtec_fw_image_header_gen3 {
 	char magic[4];
 	uint32_t image_len;
@@ -164,12 +198,29 @@ struct switchtec_fw_image_header_gen3 {
 	uint32_t image_crc;
 };
 
+typedef enum
+{
+    MRPC_FW_IMG_GET_CMD_START = 0,
+    MRPC_FW_IMG_GET_CMD_NEXT = 1,
+
+    MRPC_FW_IMG_GET_CMD_MAX
+} mrpc_fw_img_get_cmd_e;
+
+struct cmd_fwget {
+	uint8_t subcmd;
+	uint8_t fw_type;
+	uint8_t fw_slot;
+	uint8_t f_from_start;
+};
+
 static uint32_t get_fw_tx_id(struct switchtec_dev *dev)
 {
+	if (switchtec_is_gen6(dev))
+		return MRPC_FW_TX_GEN6;
 	if (switchtec_is_gen5(dev))
 		return MRPC_FW_TX_GEN5;
-	else
-		return MRPC_FW_TX;
+	
+	return MRPC_FW_TX;
 }
 
 static int switchtec_fw_dlstatus(struct switchtec_dev *dev,
@@ -295,6 +346,97 @@ int switchtec_fw_set_redundant_flag (struct switchtec_dev *dev, int keyman,
 		ret += set_redundant(dev, SWITCHTEC_PART_TYPE_FW, set);
 
 	return ret;
+}
+
+/**
+ * @brief Download fwimg file from device
+ * @brief Write a firmware file to the switchtec device
+ * @param[in] dev		Switchtec device handle
+ * @param[in] fd		File descriptor for the image file to write
+ * @param[in] fw_type		Firmware type to download
+ * @param[in] fw_slot		Firmware slot to download
+ * @param[in] progress_callback If not NULL, this function will be called to
+ * 	indicate the progress.
+ * @return 0 on success, error code on failure
+ *
+ * The fw_img_get command will download the firmware image corresponding to fw type and slot 
+ * from the device to the file descriptor provided.
+ */
+int switchtec_fw_img_get(struct switchtec_dev *dev, int fd, 
+						enum switchtec_fw_type_gen6 fw_type, int fw_slot, 
+						void (*progress_callback)(int cur, int tot))
+{
+  	struct cmd_fwget cmd = {0};
+
+	struct fw_img_get_resp_t {
+		uint8_t status;
+		uint8_t fw_type;
+		uint8_t fw_slot;
+		uint8_t reserved;
+		uint32_t total_len;
+		uint32_t offset;
+		uint32_t chunk_len;
+		uint32_t *data;
+	};
+
+	uint8_t resp[MRPC_MAX_DATA_LEN] ={};
+	struct fw_img_get_resp_t *fw_img_get_resp = (struct fw_img_get_resp_t *)resp;
+	int ret;
+
+	/* erase existing file */
+	if (ftruncate(fd, 0) == -1) {
+		perror("ftruncate");
+		return 1;
+	}
+
+	cmd.subcmd = 0;
+	cmd.fw_type = fw_type;
+	cmd.fw_slot = fw_slot;
+	cmd.f_from_start = MRPC_FW_IMG_GET_CMD_START;
+
+	ret = switchtec_cmd(dev, MRPC_FW_IMG_GET, &cmd, sizeof(cmd),
+		resp, sizeof(resp));
+
+	if(ret){
+		printf("Error during FW image get\n");
+		return ret;
+	}
+
+	size_t written = write(fd, (void*)(&fw_img_get_resp->data), fw_img_get_resp->chunk_len);
+	if (written != fw_img_get_resp->chunk_len) {
+		perror("Error writing to file");
+		return 1;
+	}
+
+	if (progress_callback)
+		progress_callback(fw_img_get_resp->offset, fw_img_get_resp->total_len);
+
+	do {
+		cmd.subcmd = 0;
+		cmd.fw_type = fw_type;
+		cmd.fw_slot = fw_slot;
+		cmd.f_from_start = MRPC_FW_IMG_GET_CMD_NEXT;
+
+		ret = switchtec_cmd(dev, MRPC_FW_IMG_GET, &cmd, sizeof(cmd),
+			resp, sizeof(resp));
+
+		if(ret){
+			printf("Error during FW image get\n");
+			return ret;
+		}
+
+		size_t written = write(fd, (void*)(&fw_img_get_resp->data), fw_img_get_resp->chunk_len);
+		if (written != fw_img_get_resp->chunk_len){
+			perror("Error writing to file");
+			return 1;
+		}
+
+		if (progress_callback)
+			progress_callback(fw_img_get_resp->offset, fw_img_get_resp->total_len);
+
+	} while((fw_img_get_resp->offset + fw_img_get_resp->chunk_len) < fw_img_get_resp->total_len);
+
+	return 0;
 }
 
 /**
@@ -474,6 +616,9 @@ enum switchtec_gen switchtec_fw_version_to_gen(unsigned int version)
 	case 6:
 	case 7:
 	case 8: return SWITCHTEC_GEN5;
+	case 9:
+	case 10:
+	case 11: return SWITCHTEC_GEN6;
 	default: return SWITCHTEC_GEN_UNKNOWN;
 	}
 }
@@ -707,12 +852,33 @@ switchtec_fw_id_to_type_gen5(const struct switchtec_fw_image_info *info)
 }
 
 static enum switchtec_fw_type
+switchtec_fw_id_to_type_gen6(const struct switchtec_fw_image_info *info)
+{
+	switch (info->part_id) {
+	case SWITCHTEC_FW_PART_ID_G6_MAP0: return SWITCHTEC_FW_TYPE_MAP;
+	case SWITCHTEC_FW_PART_ID_G6_MAP1: return SWITCHTEC_FW_TYPE_MAP;
+	case SWITCHTEC_FW_PART_ID_G6_KEY0: return SWITCHTEC_FW_TYPE_KEY;
+	case SWITCHTEC_FW_PART_ID_G6_KEY1: return SWITCHTEC_FW_TYPE_KEY;
+	case SWITCHTEC_FW_PART_ID_G6_BL20: return SWITCHTEC_FW_TYPE_BL2;
+	case SWITCHTEC_FW_PART_ID_G6_BL21: return SWITCHTEC_FW_TYPE_BL2;
+	case SWITCHTEC_FW_PART_ID_G6_CFG0: return SWITCHTEC_FW_TYPE_CFG;
+	case SWITCHTEC_FW_PART_ID_G6_CFG1: return SWITCHTEC_FW_TYPE_CFG;
+	case SWITCHTEC_FW_PART_ID_G6_IMG0: return SWITCHTEC_FW_TYPE_IMG;
+	case SWITCHTEC_FW_PART_ID_G6_IMG1: return SWITCHTEC_FW_TYPE_IMG;
+	case SWITCHTEC_FW_PART_ID_G6_NVLOG: return SWITCHTEC_FW_TYPE_NVLOG;
+	case SWITCHTEC_FW_PART_ID_G6_SEEPROM: return SWITCHTEC_FW_TYPE_SEEPROM;
+	default: return SWITCHTEC_FW_TYPE_UNKNOWN;
+	}
+}
+
+static enum switchtec_fw_type
 switchtec_fw_id_to_type(const struct switchtec_fw_image_info *info)
 {
 	switch (info->gen) {
 	case SWITCHTEC_GEN3: return switchtec_fw_id_to_type_gen3(info);
 	case SWITCHTEC_GEN4: return switchtec_fw_id_to_type_gen4(info);
 	case SWITCHTEC_GEN5: return switchtec_fw_id_to_type_gen5(info);
+	case SWITCHTEC_GEN6: return switchtec_fw_id_to_type_gen6(info);
 	default: return SWITCHTEC_FW_TYPE_UNKNOWN;
 	}
 }
@@ -1173,6 +1339,47 @@ err_out:
 	return -1;
 }
 
+static int switchtec_fw_info_metadata_gen6(struct switchtec_dev *dev,
+					   struct switchtec_fw_image_info *inf)
+{
+	struct switchtec_fw_metadata_gen6 *metadata;
+	struct {
+		uint8_t subcmd;
+		uint8_t part_id;
+	} subcmd = {
+		.subcmd = MRPC_PART_INFO_GET_METADATA_GEN6,
+		.part_id = inf->part_id,
+	};
+	int ret;
+
+	if (inf->part_id == SWITCHTEC_FW_PART_ID_G6_NVLOG)
+		return 1;
+	if (inf->part_id == SWITCHTEC_FW_PART_ID_G6_SEEPROM)
+		subcmd.subcmd = MRPC_PART_INFO_GET_SEEPROM_GEN6;
+
+	metadata = malloc(sizeof(*metadata));
+	if (!metadata)
+		return -1;
+
+	ret = switchtec_cmd(dev, MRPC_PART_INFO, &subcmd, sizeof(subcmd),
+			    metadata, sizeof(*metadata));
+	if (ret)
+		goto err_out;
+
+	version_to_string(le32toh(metadata->version), inf->version,
+			  sizeof(inf->version));
+	inf->part_body_offset = le32toh(metadata->header_len);
+	inf->image_crc = le32toh(metadata->image_crc);
+	inf->image_len = le32toh(metadata->image_len);
+	inf->metadata = metadata;
+
+	return 0;
+
+err_out:
+	free(metadata);
+	return -1;
+}
+
 struct switchtec_flash_info_gen4 {
 	uint32_t firmware_version;
 	uint32_t flash_size;
@@ -1224,6 +1431,28 @@ struct switchtec_flash_info_gen5 {
 					      riot0, riot1, bl20, bl21,
 					      cfg0, cfg1, img0, img1, nvlog,
 					      vendor[8];
+};
+
+struct switchtec_flash_info_gen6 {
+	uint32_t firmware_version;
+	uint32_t flash_size;
+	uint16_t device_id;
+	uint8_t ecc_enable;
+	uint8_t rsvd1;
+	uint8_t running_bl2_flag;
+	uint8_t running_cfg_flag;
+	uint8_t running_img_flag;
+	uint8_t running_key_flag;
+	uint8_t rsvd2[3];
+	uint8_t key_redundant_flag;
+	uint8_t bl2_redundant_flag;
+	uint8_t cfg_redundant_flag;
+	uint8_t img_redundant_flag;
+	uint8_t rsvd3[3];
+	uint32_t rsvd4[9];
+	struct switchtec_flash_part_info_gen4 map0, map1, keyman0, keyman1, bl20, 
+						bl21, cfg0, cfg1, img0, img1, 
+						nvlog, vendor[8];
 };
 
 static int switchtec_fw_part_info_gen4(struct switchtec_dev *dev,
@@ -1385,6 +1614,76 @@ static int switchtec_fw_part_info_gen5(struct switchtec_dev *dev,
 	return switchtec_fw_info_metadata_gen5(dev, inf);
 }
 
+static int switchtec_fw_part_info_gen6(struct switchtec_dev *dev,
+				       struct switchtec_fw_image_info *inf,
+				       struct switchtec_flash_info_gen6 *all)
+{
+	struct switchtec_flash_part_info_gen4 *part_info;
+	int ret;
+
+	switch(inf->part_id) {
+	case SWITCHTEC_FW_PART_ID_G6_MAP0:
+		part_info = &all->map0;
+		break;
+	case SWITCHTEC_FW_PART_ID_G6_MAP1:
+		part_info = &all->map1;
+		break;
+	case SWITCHTEC_FW_PART_ID_G6_KEY0:
+		part_info = &all->keyman0;
+		break;
+	case SWITCHTEC_FW_PART_ID_G6_KEY1:
+		part_info = &all->keyman1;
+		break;
+	case SWITCHTEC_FW_PART_ID_G6_BL20:
+		part_info = &all->bl20;
+		break;
+	case SWITCHTEC_FW_PART_ID_G6_BL21:
+		part_info = &all->bl21;
+		break;
+	case SWITCHTEC_FW_PART_ID_G6_IMG0:
+		part_info = &all->img0;
+		break;
+	case SWITCHTEC_FW_PART_ID_G6_IMG1:
+		part_info = &all->img1;
+		break;
+	case SWITCHTEC_FW_PART_ID_G6_CFG0:
+		part_info = &all->cfg0;
+		break;
+	case SWITCHTEC_FW_PART_ID_G6_CFG1:
+		part_info = &all->cfg1;
+		break;
+	case SWITCHTEC_FW_PART_ID_G6_NVLOG:
+		part_info = &all->nvlog;
+		break;
+	case SWITCHTEC_FW_PART_ID_G6_SEEPROM:
+		inf->active = true;
+		/* length is not applicable for SEEPROM image */
+		inf->part_len = 0xffffffff;
+
+		ret = switchtec_fw_info_metadata_gen6(dev, inf);
+		if (!ret) {
+			inf->running = true;
+			inf->valid = true;
+		}
+
+		return 0;
+	default:
+		errno = EINVAL;
+		return -1;
+	}
+
+	inf->part_addr = le32toh(part_info->part_start);
+	inf->part_len = le32toh(part_info->part_size_dw) * 4;
+	inf->active = part_info->active;
+	inf->running = part_info->is_using;
+	inf->read_only = part_info->read_only;
+	inf->valid = part_info->valid;
+	if (!inf->valid)
+		return 0;
+
+	return switchtec_fw_info_metadata_gen6(dev, inf);
+}
+
 /**
  * @brief Return firmware information structures for a number of firmware
  *	partitions.
@@ -1402,6 +1701,7 @@ static int switchtec_fw_part_info(struct switchtec_dev *dev, int nr_info,
 	uint8_t subcmd = MRPC_PART_INFO_GET_ALL_INFO;
 	struct switchtec_flash_info_gen4 all_info_gen4;
 	struct switchtec_flash_info_gen5 all_info_gen5;
+	struct switchtec_flash_info_gen6 all_info_gen6;
 
 	if (info == NULL || nr_info == 0)
 		return -EINVAL;
@@ -1427,6 +1727,17 @@ static int switchtec_fw_part_info(struct switchtec_dev *dev, int nr_info,
 			le32toh(all_info_gen5.firmware_version);
 		all_info_gen5.flash_size = le32toh(all_info_gen5.flash_size);
 		all_info_gen5.device_id = le16toh(all_info_gen5.device_id);
+	} else if (dev->gen == SWITCHTEC_GEN6) {
+		subcmd = MRPC_PART_INFO_GET_ALL_INFO_GEN6;
+		ret = switchtec_cmd(dev, MRPC_PART_INFO, &subcmd,
+				    sizeof(subcmd), &all_info_gen6,
+				    sizeof(all_info_gen6));
+		if (ret)
+			return ret;
+		all_info_gen6.firmware_version =
+			le32toh(all_info_gen6.firmware_version);
+		all_info_gen6.flash_size = le32toh(all_info_gen6.flash_size);
+		all_info_gen6.device_id = le16toh(all_info_gen6.device_id);
 	}
 
 	for (i = 0; i < nr_info; i++) {
@@ -1450,6 +1761,10 @@ static int switchtec_fw_part_info(struct switchtec_dev *dev, int nr_info,
 		case SWITCHTEC_GEN5:
 			ret = switchtec_fw_part_info_gen5(dev, inf,
 							  &all_info_gen5);
+			break;
+		case SWITCHTEC_GEN6:
+			ret = switchtec_fw_part_info_gen6(dev, inf,
+							  &all_info_gen6);
 			break;
 		default:
 			errno = EINVAL;
@@ -1604,6 +1919,22 @@ switchtec_fw_partitions_gen5[] = {
 	SWITCHTEC_FW_PART_ID_G5_SEEPROM,
 };
 
+static const enum switchtec_fw_image_part_id_gen6
+switchtec_fw_partitions_gen6[] = {
+	SWITCHTEC_FW_PART_ID_G6_MAP0,
+	SWITCHTEC_FW_PART_ID_G6_MAP1,
+	SWITCHTEC_FW_PART_ID_G6_KEY0,
+	SWITCHTEC_FW_PART_ID_G6_KEY1,
+	SWITCHTEC_FW_PART_ID_G6_BL20,
+	SWITCHTEC_FW_PART_ID_G6_BL21,
+	SWITCHTEC_FW_PART_ID_G6_CFG0,
+	SWITCHTEC_FW_PART_ID_G6_CFG1,
+	SWITCHTEC_FW_PART_ID_G6_IMG0,
+	SWITCHTEC_FW_PART_ID_G6_IMG1,
+	SWITCHTEC_FW_PART_ID_G6_NVLOG,
+	SWITCHTEC_FW_PART_ID_G6_SEEPROM,
+};
+
 static struct switchtec_fw_part_type *
 switchtec_fw_type_ptr(struct switchtec_fw_part_summary *summary,
 		      struct switchtec_fw_image_info *info)
@@ -1650,6 +1981,9 @@ switchtec_fw_part_summary(struct switchtec_dev *dev)
 	case SWITCHTEC_GEN5:
 		nr_info = ARRAY_SIZE(switchtec_fw_partitions_gen5);
 		break;
+	case SWITCHTEC_GEN6:
+		nr_info = ARRAY_SIZE(switchtec_fw_partitions_gen6);
+		break;
 	default:
 		errno = EINVAL;
 		return NULL;
@@ -1679,6 +2013,11 @@ switchtec_fw_part_summary(struct switchtec_dev *dev)
 		for (i = 0; i < nr_info; i++)
 			summary->all[i].part_id =
 				switchtec_fw_partitions_gen5[i];
+		break;
+	case SWITCHTEC_GEN6:
+		for (i = 0; i < nr_info; i++)
+			summary->all[i].part_id =
+				switchtec_fw_partitions_gen6[i];
 		break;
 	default:
 		errno = EINVAL;
@@ -1898,7 +2237,8 @@ int switchtec_fw_img_write_hdr(int fd, struct switchtec_fw_image_info *info)
 	switch (info->gen) {
 	case SWITCHTEC_GEN3: return switchtec_fw_img_write_hdr_gen3(fd, info);
 	case SWITCHTEC_GEN4:
-	case SWITCHTEC_GEN5: return switchtec_fw_img_write_hdr_gen4(fd, info);
+	case SWITCHTEC_GEN5:
+	case SWITCHTEC_GEN6: return switchtec_fw_img_write_hdr_gen4(fd, info);
 	default:
 		errno = EINVAL;
 		return -1;

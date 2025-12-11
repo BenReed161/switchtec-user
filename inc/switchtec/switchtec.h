@@ -50,7 +50,9 @@ struct switchtec_dev;
 
 #define SWITCHTEC_MAX_PARTS  48
 #define SWITCHTEC_MAX_PORTS  60
+#define SWITCHTEC_MAX_PORTS_GEN6 20
 #define SWITCHTEC_MAX_LANES  100
+#define SWITCHTEC_MAX_LANES_GEN6 144
 #define SWITCHTEC_MAX_STACKS 8
 #define SWITCHTEC_PORTS_PER_STACK 8
 #define SWITCHTEC_MAX_EVENT_COUNTERS 64
@@ -92,6 +94,7 @@ enum switchtec_gen {
 	SWITCHTEC_GEN3,
 	SWITCHTEC_GEN4,
 	SWITCHTEC_GEN5,
+	SWITCHTEC_GEN6,
 	SWITCHTEC_GEN_UNKNOWN,
 };
 
@@ -264,6 +267,36 @@ enum switchtec_fw_type {
 	SWITCHTEC_FW_TYPE_RIOT,
 };
 
+/* @brief
+*    Gen6 FW read FW-types
+*
+* @note
+*   These mrpc fw types are aligned to device fw types currently
+*   but that is not required and may diverge in the future.
+*   Intention is to keep the mrpc consistent over several generations
+*   of devices even if device fw types change.
+*/
+enum switchtec_fw_type_gen6 {
+	SWITCHTEC_IMG_PART_TYPE_MAP = 0,         /**< partition map partition */
+	SWITCHTEC_IMG_PART_TYPE_KMT = 1,         /**< key manifest table */
+	SWITCHTEC_IMG_PART_TYPE_BL2 = 2,         /**< bootloader 2 partition */
+	SWITCHTEC_IMG_PART_TYPE_DATA = 3,        /**< configuration file partition */
+	SWITCHTEC_IMG_PART_TYPE_FW = 4,          /**< main firmware image partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_5 = 5,      /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_CERT = 6,        /**< Cert partition */
+	SWITCHTEC_IMG_PART_TYPE_DEBUG_TOKEN = 7, /**< Debug token partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_8 = 8,      /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_9 = 9,      /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_10 = 10,    /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_11 = 11,    /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_12 = 12,    /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_13 = 13,    /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_14 = 14,    /**< reserved partition */
+	SWITCHTEC_IMG_PART_TYPE_RSVD_15 = 15,    /**< reserved partition */
+
+	SWITCHTEC_IMG_PART_TYPE_NUM,     /**< Number of active partition names in partition map */
+};
+
 /**
  * @brief Information about a firmware image or partition
  */
@@ -406,6 +439,9 @@ _PURE enum switchtec_boot_phase
 switchtec_boot_phase(struct switchtec_dev *dev);
 int switchtec_set_pax_id(struct switchtec_dev *dev, int pax_id);
 int switchtec_echo(struct switchtec_dev *dev, uint32_t input, uint32_t *output);
+int switchtec_fw_img_get(struct switchtec_dev *dev, int fd, 
+						enum switchtec_fw_type_gen6 fw_type, int fw_slot, 
+						void (*progress_callback)(int cur, int tot));
 int switchtec_hard_reset(struct switchtec_dev *dev);
 int switchtec_status(struct switchtec_dev *dev,
 		     struct switchtec_status **status);
@@ -480,12 +516,28 @@ static inline int switchtec_is_gen5(struct switchtec_dev *dev)
 }
 
 /**
+ * @brief Return whether a Switchtec device is a Gen 6 device.
+ */
+static inline int switchtec_is_gen6(struct switchtec_dev *dev)
+{
+	return switchtec_gen(dev) == SWITCHTEC_GEN6;
+}
+
+/**
  * @brief Return the max number of ports of a Switchtec device.
  */
 static inline int switchtec_max_supported_ports(struct switchtec_dev *dev)
 {
-	return switchtec_is_gen5(dev) ? SWITCHTEC_MAX_PORTS :
-	       switchtec_is_gen4(dev) ? 52 : 48;
+	switch(switchtec_gen(dev)) {
+	case SWITCHTEC_GEN6:
+		return SWITCHTEC_MAX_PORTS_GEN6;
+	case SWITCHTEC_GEN5:
+		return SWITCHTEC_MAX_PORTS;
+	case SWITCHTEC_GEN4:
+		return 52;
+	default:
+		return 48;
+	}
 }
 
 /**
@@ -597,7 +649,8 @@ static inline const char *switchtec_gen_str(struct switchtec_dev *dev)
 
 	str =  switchtec_is_gen3(dev) ? "GEN3" :
 	       switchtec_is_gen4(dev) ? "GEN4" :
-	       switchtec_is_gen5(dev) ? "GEN5" : "Unknown";
+	       switchtec_is_gen5(dev) ? "GEN5" :
+	       switchtec_is_gen6(dev) ? "GEN6" : "Unknown";
 
 	return str;
 }
@@ -626,6 +679,7 @@ switchtec_fw_image_gen_str(struct switchtec_fw_image_info *inf)
 	case SWITCHTEC_GEN3: return "GEN3";
 	case SWITCHTEC_GEN4: return "GEN4";
 	case SWITCHTEC_GEN5: return "GEN5";
+	case SWITCHTEC_GEN6: return "GEN6";
 	default:	     return "UNKNOWN";
 	}
 }
@@ -875,10 +929,55 @@ static inline const char *switchtec_ltssm_str_gen5(int ltssm, int show_minor)
 	}
 }
 
+static inline const char *switchtec_ltssm_str_gen6(int ltssm_major)
+{
+	switch(ltssm_major) {
+	case 0x00: return "DETECT_QUIET";
+	case 0x01: return "DETECT_ACTIVE";
+	case 0x02: return "POLL_ACTIVE";
+	case 0x03: return "POLL_COMPLIANCE";
+	case 0x04: return "POLL_CONFIG";
+	case 0x05: return "PRE_DETECT_QUIET";
+	case 0x06: return "DETECT_WAIT";
+	case 0x07: return "CFG_LINKWD_START";
+	case 0x08: return "CFG_LINKWD_ACEPT";
+	case 0x09: return "CFG_LANENUM_WAI";
+	case 0x0A: return "CFG_LANENUM_ACEPT";
+	case 0x0B: return "CFG_COMPLETE";
+	case 0x0C: return "CFG_IDLE";
+	case 0x0D: return "RCVRY_LOCK";
+	case 0x0E: return "RCVRY_SPEED";
+	case 0x0F: return "RCVRY_RCVRCFG";
+	case 0x10: return "RCVRY_IDLE";
+	case 0x11: return "L0";
+	case 0x12: return "L0S";
+	case 0x13: return "L123_SEND_EIDLE";
+	case 0x14: return "L1_IDLE";
+	case 0x15: return "L2_IDLE";
+	case 0x16: return "L2_WAKE";
+	case 0x17: return "DISABLED_ENTRY";
+	case 0x18: return "DISABLED_IDLE";
+	case 0x19: return "DISABLED";
+	case 0x1A: return "LPBK_ENTRY";
+	case 0x1B: return "LPBK_ACTIVE";
+	case 0x1C: return "LPBK_EXIT";
+	case 0x1D: return "LPBK_EXIT_TIMEOUT";
+	case 0x1E: return "HOT_RESET_ENTRY";
+	case 0x1F: return "HOT_RESET";
+	case 0x20: return "RCVRY_EQ0";
+	case 0x21: return "RCVRY_EQ1";
+	case 0x22: return "RCVRY_EQ2";
+	case 0x23: return "RCVRY_EQ3";
+	default:   return "UNKNOWN";
+	}
+}
+
 static inline const char *switchtec_ltssm_str(int ltssm, int show_minor,
 					      struct switchtec_dev *dev)
 {
-	if(switchtec_is_gen5(dev))
+	if (switchtec_is_gen6(dev))
+		return switchtec_ltssm_str_gen6(ltssm);
+	else if(switchtec_is_gen5(dev))
 		return switchtec_ltssm_str_gen5(ltssm, show_minor);
 	else
 		return switchtec_ltssm_str_gen4(ltssm, show_minor);
@@ -1034,6 +1133,22 @@ int switchtec_get_stack_bif(struct switchtec_dev *dev, int stack_id,
 			    int port_bif[SWITCHTEC_PORTS_PER_STACK]);
 int switchtec_set_stack_bif(struct switchtec_dev *dev, int stack_id,
 			    int port_bif[SWITCHTEC_PORTS_PER_STACK]);
+/********** RTC Counter **********/
+struct switchtec_rtc {
+	uint8_t sub_cmd;
+	uint8_t reserved[3];
+	uint64_t rtc_counter;
+};
+
+enum RTC_OPERATION {
+	MRPC_RTC_RESET,
+	MRPC_RTC_SET,
+	MRPC_RTC_GET,
+};
+
+int switchtec_rtc_counter_reset(struct switchtec_dev *dev, uint64_t *rtc_counter);
+int switchtec_rtc_counter_set(struct switchtec_dev *dev, uint64_t *rtc_counter);
+int switchtec_rtc_counter_get(struct switchtec_dev *dev, uint64_t *rtc_counter);
 
 /******** GPIO Management ********/
 
@@ -1313,7 +1428,8 @@ enum link_rate_enum {
 	PCIE_LINK_RATE_GEN3 = 3,  //!< Gen3, supports 2.5GT/s, 5GT/s, 8GT/s
 	PCIE_LINK_RATE_GEN4 = 4,  //!< Gen4, supports 2.5GT/s, 5GT/s, 8GT/s, 16GT/s
 	PCIE_LINK_RATE_GEN5 = 5,  //!< Gen5, supports 2.5GT/s, 5GT/s, 8GT/s, 16GT/s, 32GT/s
-	PCIE_LINK_RATE_NUM  = 5   //!< Total number of PCIe generations
+	PCIE_LINK_RATE_GEN6 = 6,  //!< Gen6, supports 2.5GT/s, 5GT/s, 8GT/s, 16GT/s, 32GT/s, 64GT/s
+	PCIE_LINK_RATE_NUM  = 6   //!< Total number of PCIe generations
 };
 
 struct switchtec_port_eq_coeff_in {
@@ -1431,6 +1547,7 @@ enum switchtec_diag_loopback_enable {
 	SWITCHTEC_DIAG_LOOPBACK_RX_TO_TX = 1 << 0,
 	SWITCHTEC_DIAG_LOOPBACK_TX_TO_RX = 1 << 1,
 	SWITCHTEC_DIAG_LOOPBACK_LTSSM = 1 << 2,
+	SWITCHTEC_DIAG_LOOPBACK_PIPE = 1 << 3,
 };
 
 enum switchtec_diag_pattern {
@@ -1472,6 +1589,7 @@ enum switchtec_diag_ltssm_speed {
 	SWITCHTEC_DIAG_LTSSM_GEN3 = 2,
 	SWITCHTEC_DIAG_LTSSM_GEN4 = 3,
 	SWITCHTEC_DIAG_LTSSM_GEN5 = 4,
+	SWITCHTEC_DIAG_LTSSM_GEN6 = 5,
 };
 
 enum switchtec_diag_end {
@@ -1497,6 +1615,10 @@ struct switchtec_diag_ltssm_log {
 	unsigned int timestamp;
 	float link_rate;
 	int link_state;
+	/* Gen 6 stucture variables */
+	int link_width;
+	int tx_minor_state;
+	int rx_minor_state;
 };
 
 int switchtec_diag_cross_hair_enable(struct switchtec_dev *dev, int lane_id);
@@ -1518,6 +1640,7 @@ int switchtec_diag_eye_cancel(struct switchtec_dev *dev);
 int switchtec_diag_loopback_set(struct switchtec_dev *dev, int port_id, 
 				int enable, int enable_parallel, 
 				int enable_external, int enable_ltssm,
+				int enable_pipe,
 				enum switchtec_diag_ltssm_speed ltssm_speed);
 int switchtec_diag_loopback_get(struct switchtec_dev *dev, int port_id,
 				int *enabled, 

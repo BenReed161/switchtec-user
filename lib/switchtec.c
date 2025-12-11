@@ -180,6 +180,22 @@ static const struct switchtec_device_id switchtec_device_id_tbl[] = {
 	{0x5552, SWITCHTEC_GEN5, SWITCHTEC_PAXA},  //PAX-A 52XG5
 	{0x5536, SWITCHTEC_GEN5, SWITCHTEC_PAXA},  //PAX-A 36XG5
 	{0x5528, SWITCHTEC_GEN5, SWITCHTEC_PAXA},  //PAX-A 28XG5
+	{0x6048, SWITCHTEC_GEN6, SWITCHTEC_PFX},   //PFXs 48XG6
+	{0x6064, SWITCHTEC_GEN6, SWITCHTEC_PFX},   //PFXs 64XG6
+	{0x6044, SWITCHTEC_GEN6, SWITCHTEC_PFX},   //PFXs 144XG6
+	{0x6060, SWITCHTEC_GEN6, SWITCHTEC_PFX},   //PFXs 160XG6
+	{0x6148, SWITCHTEC_GEN6, SWITCHTEC_PSX},   //PSXs 48XG6
+	{0x6164, SWITCHTEC_GEN6, SWITCHTEC_PSX},   //PSXs 64XG6
+	{0x6144, SWITCHTEC_GEN6, SWITCHTEC_PSX},   //PSXs 144XG6
+	{0x6160, SWITCHTEC_GEN6, SWITCHTEC_PSX},   //PSXs 160XG6
+	{0x6248, SWITCHTEC_GEN6, SWITCHTEC_PFX},   //PFX 48XG6
+	{0x6264, SWITCHTEC_GEN6, SWITCHTEC_PFX},   //PFX 64XG6
+	{0x6244, SWITCHTEC_GEN6, SWITCHTEC_PFX},   //PFX 144XG6
+	{0x6260, SWITCHTEC_GEN6, SWITCHTEC_PFX},   //PFX 160XG6
+	{0x6348, SWITCHTEC_GEN6, SWITCHTEC_PSX},   //PSX 48XG6
+	{0x6364, SWITCHTEC_GEN6, SWITCHTEC_PSX},   //PSX 64XG6
+	{0x6344, SWITCHTEC_GEN6, SWITCHTEC_PSX},   //PSX 144XG6
+	{0x6360, SWITCHTEC_GEN6, SWITCHTEC_PSX},   //PSX 160XG6
 	{0},
 };
 
@@ -1780,6 +1796,9 @@ static enum switchtec_gen map_to_gen(uint32_t gen)
 	case 1:
 		ret = SWITCHTEC_GEN5;
 		break;
+	case 2:
+		ret = SWITCHTEC_GEN6;
+		break;
 	default:
 		ret = SWITCHTEC_GEN_UNKNOWN;
 		break;
@@ -2428,6 +2447,72 @@ int switchtec_get_all_pin_sts(struct switchtec_dev *dev, uint32_t *values)
 	memcpy(values, out.pin_values, sizeof(out.pin_values));
 
 	return 0;
+}
+
+/**
+ * @brief Perform a reset operation on the RTC counter
+ * @param[in] dev	  Switchtec device handle
+ * @return 0 on success, or a negative value on failure	
+ */
+int switchtec_rtc_counter_reset(struct switchtec_dev *dev, uint64_t *rtc_counter)
+{
+	int ret;
+	struct switchtec_rtc in, out;
+	in.sub_cmd = MRPC_RTC_RESET;
+	
+	ret = switchtec_cmd(dev, MRPC_RTC, &in, sizeof(in), &out, sizeof(out));
+	if (ret)
+		return ret;
+	
+	*rtc_counter = out.rtc_counter;
+
+	return 0;
+	
+}
+
+/**
+ * @brief Set the RTC counter
+ * @param[in] dev	  Switchtec device handle
+ * @param[in] rtc_counter Pointer to store the RTC counter value
+ * @return 0 on success, or a negative value on failure	
+ */
+int switchtec_rtc_counter_set(struct switchtec_dev *dev, uint64_t *rtc_counter)
+{
+	int ret;
+	struct switchtec_rtc in, out;
+
+	in.sub_cmd = MRPC_RTC_SET;
+	in.rtc_counter = *rtc_counter;
+	
+	ret = switchtec_cmd(dev, MRPC_RTC, &in, sizeof(in), &out, sizeof(out));
+	if (ret)
+		return ret;
+
+	return 0;
+	
+}
+
+/**
+ * @brief Get the RTC counter
+ * @param[in] dev	  Switchtec device handle
+ * @param[in] rtc_counter Pointer to store the RTC counter value
+ * @return 0 on success, or a negative value on failure	
+ */
+int switchtec_rtc_counter_get(struct switchtec_dev *dev, uint64_t *rtc_counter)
+{
+	int ret;
+	struct switchtec_rtc in, out;
+
+	in.sub_cmd = MRPC_RTC_GET;
+	
+	ret = switchtec_cmd(dev, MRPC_RTC, &in, sizeof(in), &out, sizeof(out));
+	if (ret)
+		return ret;
+	
+	*rtc_counter = out.rtc_counter;
+
+	return 0;
+	
 }
 
 /**@}*/

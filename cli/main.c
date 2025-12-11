@@ -1150,6 +1150,7 @@ static int log_parse(int argc, char **argv)
 		{"GEN3", SWITCHTEC_GEN3, "GEN3"},
 		{"GEN4", SWITCHTEC_GEN4, "GEN4"},
 		{"GEN5", SWITCHTEC_GEN5, "GEN5"},
+		{"GEN6", SWITCHTEC_GEN6, "GEN6"},
 		{"UNKNOWN", SWITCHTEC_GEN_UNKNOWN, "UNKNOWN"},
 		{}
 	};
@@ -2276,6 +2277,7 @@ static int fw_read(int argc, char **argv)
 	struct switchtec_fw_part_summary *sum;
 	struct switchtec_fw_image_info *inf;
 	int ret = 0;
+	int fw_typ_gen6 = SWITCHTEC_IMG_PART_TYPE_FW;
 
 	static struct {
 		struct switchtec_dev *dev;
@@ -2286,6 +2288,7 @@ static int fw_read(int argc, char **argv)
 		int data;
 		int bl2;
 		int key;
+		int pmap;
 		int no_progress_bar;
 	} cfg = {
 		.out_fd = -1
@@ -2306,12 +2309,23 @@ static int fw_read(int argc, char **argv)
 		{"bl2", 'b', "", CFG_NONE, &cfg.bl2, no_argument,
 		 "read the BL2 partiton instead of the main firmware"},
 		{"key", 'k', "", CFG_NONE, &cfg.key, no_argument,
-		 "read the key manifest partiton instead of the main firmware"},
+		 "read the key manifest partiton instead of the main firmware - Gen5 and below only"},
+		{"pmap", 'm', "", CFG_NONE, &cfg.pmap, no_argument, 
+		 "read the partition map instead of the main firmware - Gen6"},
 		{"no-progress", 'p', "", CFG_NONE, &cfg.no_progress_bar, no_argument,
 		"don't print progress to stdout"},
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_DESC_FW_READ, opts, &cfg, sizeof(cfg));
+
+	if (!switchtec_is_gen6(cfg.dev) && cfg.pmap) {
+		fprintf(stderr, "Getting the parition map is only available on Gen6 Switchtec device!\n");
+		return -1;
+	}
+	if (switchtec_is_gen6(cfg.dev) && cfg.key) {
+		fprintf(stderr, "Getting the key manifest is not available on Gen6 Switchtec device!\n");
+		return -1;
+	}
 
 	if(cfg.out_fd == -1) {
 		if (switchtec_is_gen3(cfg.dev))
@@ -2328,14 +2342,21 @@ static int fw_read(int argc, char **argv)
 		goto close_and_exit;
 	}
 
-	if (cfg.data)
+	if (cfg.data) {
 		inf = cfg.inactive ? sum->cfg.inactive : sum->cfg.active;
-	else if (cfg.bl2)
+		fw_typ_gen6 = SWITCHTEC_IMG_PART_TYPE_DATA;
+	} else if (cfg.bl2) {
 		inf = cfg.inactive ? sum->bl2.inactive : sum->bl2.active;
-	else if (cfg.key)
+		fw_typ_gen6 = SWITCHTEC_IMG_PART_TYPE_BL2;
+	} else if (cfg.key) {
 		inf = cfg.inactive ? sum->key.inactive : sum->key.active;
-	else
+	} else if (cfg.pmap) {
+		inf = cfg.inactive ? sum->map.inactive : sum->map.active;
+		fw_typ_gen6 = SWITCHTEC_IMG_PART_TYPE_MAP;
+	} else {
 		inf = cfg.inactive ? sum->img.inactive : sum->img.active;
+		fw_typ_gen6 = SWITCHTEC_IMG_PART_TYPE_FW;
+	}
 
 	if (!inf) {
 		fprintf(stderr,
@@ -2347,8 +2368,8 @@ static int fw_read(int argc, char **argv)
 	if (inf->valid) {
 		fprintf(stderr, "Version:  %s\n", inf->version);
 		fprintf(stderr, "Type:     %s\n",
-			cfg.data ? "DAT" : cfg.bl2? "BL2" :
-			cfg.key? "KEY" : "IMG");
+			cfg.data ? "DAT" : cfg.bl2 ? "BL2" :
+			cfg.key ? "KEY" : cfg.pmap ? "PMAP" : "IMG");
 		fprintf(stderr, "Img Len:  0x%x\n", (int)inf->image_len);
 		fprintf(stderr, "CRC:      0x%x\n", (int)inf->image_crc);
 	}
@@ -2364,29 +2385,41 @@ static int fw_read(int argc, char **argv)
 		}
 	}
 
-	ret = switchtec_fw_img_write_hdr(cfg.out_fd, inf);
-	if (ret < 0) {
-		switchtec_perror(cfg.out_filename);
-		goto close_and_exit;
-	}
+	if (switchtec_is_gen6(cfg.dev)) {
+		int fw_slot = (int)inf->part_id;
+		if (fw_slot != 0)
+			fw_slot = (fw_slot % 2) ? 0 : 1;
+		progress_start();
+		if (cfg.no_progress_bar)
+			ret = switchtec_fw_img_get(cfg.dev, cfg.out_fd, fw_typ_gen6, 
+										fw_slot, NULL);
+		else
+			ret = switchtec_fw_img_get(cfg.dev, cfg.out_fd, fw_typ_gen6, 
+										fw_slot, progress_update);
+	} else {
+		ret = switchtec_fw_img_write_hdr(cfg.out_fd, inf);
+		if (ret < 0) {
+			switchtec_perror(cfg.out_filename);
+			goto close_and_exit;
+		}
 
-	progress_start();
-	if (cfg.no_progress_bar)
-		ret = switchtec_fw_body_read_fd(cfg.dev, cfg.out_fd,
-						inf, NULL);
-	else
-		ret = switchtec_fw_body_read_fd(cfg.dev, cfg.out_fd,
-						inf, progress_update);
+		progress_start();
+		if (cfg.no_progress_bar)
+			ret = switchtec_fw_body_read_fd(cfg.dev, cfg.out_fd,
+											inf, NULL);
+		else
+			ret = switchtec_fw_body_read_fd(cfg.dev, cfg.out_fd,
+											inf, progress_update);
+	}
+	switchtec_fw_part_summary_free(sum);
 	progress_finish(cfg.no_progress_bar);
 
-	if (ret < 0)
+	if (ret) {
 		switchtec_perror("fw_read");
-	else
-		ret = 0;
+		goto close_and_exit;
+	}	
 
 	fprintf(stderr, "\nFirmware read to %s.\n", cfg.out_filename);
-
-	switchtec_fw_part_summary_free(sum);
 
 close_and_exit:
 	close(cfg.out_fd);
@@ -2823,6 +2856,69 @@ static int evcntr_wait(int argc, char **argv)
 	return 0;
 }
 
+#define CMD_DESC_RTC "read the real-time clock"
+static int rtc(int argc, char **argv)
+{
+	int ret, operation;
+	uint64_t rtc_counter;
+
+	static struct {
+		struct switchtec_dev *dev;
+		uint64_t rtc_counter;
+		int rtc_reset;
+	} cfg = {};
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{"rtc_counter", 'r', "uS", CFG_INT, &cfg.rtc_counter, required_argument,
+		 "rtc counter in microseconds\n"},
+		{"reset rtc", 'R', "", CFG_NONE, &cfg.rtc_reset, no_argument,
+		 "reset rtc counter\n"},
+		{NULL}};
+
+	argconfig_parse(argc, argv, CMD_DESC_RTC, opts, &cfg, sizeof(cfg));
+	if (!switchtec_is_gen6(cfg.dev)) {
+		fprintf(stderr, "RTC only available on Gen6 switchtec devices\n");
+		return 1;
+	}
+	rtc_counter = cfg.rtc_counter;
+
+	if (cfg.rtc_counter && cfg.rtc_reset) {
+		fprintf(stderr, "Cannot both set and reset the RTC counter at once\n");
+		return 1;
+	}
+
+	if (cfg.rtc_counter) {
+		operation = 1;
+		printf("Setting RTC Counter to %ld microseconds\n", rtc_counter);
+	} else {
+		operation = 2;
+	}
+
+	if( cfg.rtc_reset) {
+		operation = 0;
+		printf("Resetting RTC Counter\n");
+	}
+	switch(operation) {
+		case MRPC_RTC_RESET:
+			ret = switchtec_rtc_counter_reset(cfg.dev, &rtc_counter);
+		case MRPC_RTC_SET:
+			ret = switchtec_rtc_counter_set(cfg.dev,  &rtc_counter);
+		case MRPC_RTC_GET:
+			ret = switchtec_rtc_counter_get(cfg.dev, &rtc_counter);
+
+	}
+	if (ret) {
+		perror("rtc");
+		return 1;
+	}
+	
+	if (operation == MRPC_RTC_GET || cfg.rtc_reset)
+		printf("RTC Counter: %ld microseconds, %ld seconds\n", rtc_counter, rtc_counter / 1000000);
+	printf("RTC operation successful\n");
+
+	return 0;
+}
+
 static const struct cmd commands[] = {
 	CMD(list, CMD_DESC_LIST),
 	CMD(info, CMD_DESC_INFO),
@@ -2853,6 +2949,7 @@ static const struct cmd commands[] = {
 	CMD(evcntr_show, CMD_DESC_EVCNTR_SHOW),
 	CMD(evcntr_del, CMD_DESC_EVCNTR_DEL),
 	CMD(evcntr_wait, CMD_DESC_EVCNTR_WAIT),
+	CMD(rtc, CMD_DESC_RTC),
 	{},
 };
 

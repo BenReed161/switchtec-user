@@ -156,6 +156,41 @@ struct get_cfgs_reply_gen5 {
 	uint8_t uds_data[32];
 };
 
+struct get_cfgs_reply_gen6 {
+	uint16_t twi_recov_info;
+	uint16_t twi_recov_addr;
+	uint16_t mrpc_cmd_map;
+	uint16_t rsrvd2;
+	uint32_t ap_offset;
+	uint64_t i3c_pid_reserved;
+    uint8_t i3c_recovery_address_reserved;
+    uint8_t i3c_bus_reserved;
+	uint16_t rsvrd3;
+    uint8_t algo_engine_disable_reserved;
+    uint8_t bootrom_key_revoke_reserved;
+    uint8_t boot_recovery_failover_disable;
+    uint8_t token_disable_reserved;
+    uint8_t puf_ac_status_reserved;
+    uint8_t puf_ac_read_mask_reserved;
+    uint8_t puf_ac_read_mask_request_reserved;
+    uint8_t otp_key_hash_status;
+    uint8_t otp_hash_key_read_mask;
+    uint8_t otp_hash_key_read_mask_request;
+    uint8_t hash_table_disable_reserved;
+    uint8_t reserved2;
+    uint32_t otp_key_hash[SWITCHTEC_KMSK_NUM_GEN6][SWITCHTEC_KMSK_LEN_DWORDS];
+};
+
+static uint32_t get_dbg_unlock_id(struct switchtec_dev *dev)
+{
+	if(switchtec_is_gen6(dev))
+		return MRPC_DBG_UNLOCK_GEN6;
+	else if (switchtec_is_gen5(dev))
+		return MRPC_DBG_UNLOCK_GEN5;
+	else
+		return MRPC_DBG_UNLOCK;
+}
+
 static int get_configs(struct switchtec_dev *dev,
 		       struct get_cfgs_reply *cfgs,
 		       int *otp_valid)
@@ -188,9 +223,23 @@ static int get_configs_gen5(struct switchtec_dev *dev,
 	uint32_t subcmd = 0;
 
 	return switchtec_mfg_cmd(dev,
+				 switchtec_is_gen6(dev) 
+				 ? MRPC_SECURITY_CONFIG_GET_GEN6 :
 				 MRPC_SECURITY_CONFIG_GET_GEN5,
 				 &subcmd, sizeof(subcmd),
 				 cfgs, sizeof(struct get_cfgs_reply_gen5));
+}
+
+static int get_configs_gen6(struct switchtec_dev *dev,
+			    struct get_cfgs_reply_gen6 *cfgs)
+{
+	uint32_t subcmd = 0;
+
+	return switchtec_mfg_cmd(dev,
+				 MRPC_SECURE_CONFIG_GET_GEN6,
+				 &subcmd, sizeof(subcmd),
+				 cfgs, sizeof(struct get_cfgs_reply_gen6));
+
 }
 
 int switchtec_security_spi_avail_rate_get(struct switchtec_dev *dev,
@@ -470,6 +519,31 @@ static int security_config_get_gen5(struct switchtec_dev *dev,
 	return 0;
 }
 
+static int security_config_get_gen6(struct switchtec_dev *dev,
+				    struct switchtec_security_cfg_state *state)
+{
+	int ret;
+	struct get_cfgs_reply_gen6 reply;
+
+	ret = get_configs_gen6(dev, &reply);
+	if (ret)
+		return ret;
+	state->i2c_port = (reply.twi_recov_info >> SECURE_CFG_GET_I2C_PORT_LSB) 
+					& SECURE_CFG_GET_I2C_PORT_MSK;
+	state->i2c_addr = ((reply.twi_recov_info & SECURE_CFG_GET_I2C_ADDR_MSK) == 0) ? 
+					(SECIRE_CFG_GET_I2C) : (reply.twi_recov_info & SECURE_CFG_GET_I2C_ADDR_MSK);
+	state->i2c_cmd_map = reply.mrpc_cmd_map & SECURE_CFG_GET_I2C_CMD_MAP_MSK;
+	state->secsc = (reply.mrpc_cmd_map >> SECURE_CFG_GET_I2C_CMD_MAP_LSB) & 0x1;
+	state->i2c_rcvry_address_ocp = ((reply.twi_recov_info & SECURE_CFG_GET_I2C_RCVRY_INF_MSK) | 
+								(reply.twi_recov_addr & SECURE_CFG_GET_I2C_RCVRY_ADDR_MSK) ? (SECURE_CFG_GET_OCP) : 
+								((reply.twi_recov_info & SECURE_CFG_GET_I2C_RCVRY_INF_MSK) | 
+								(reply.twi_recov_addr & SECURE_CFG_GET_I2C_RCVRY_ADDR_MSK)));
+	memcpy(state->otp_key_hash, reply.otp_key_hash, 
+			SWITCHTEC_KMSK_NUM_GEN6 * SWITCHTEC_KMSK_LEN);
+
+	return 0;
+}
+
 /**
  * @brief Get secure boot configurations
  * @param[in]  dev	Switchtec device handle
@@ -479,6 +553,8 @@ static int security_config_get_gen5(struct switchtec_dev *dev,
 int switchtec_security_config_get(struct switchtec_dev *dev,
 				  struct switchtec_security_cfg_state *state)
 {
+	if (switchtec_is_gen6(dev))
+		return security_config_get_gen6(dev, state);
 	if (switchtec_is_gen5(dev))
 		return security_config_get_gen5(dev, state);
 	else
@@ -515,7 +591,67 @@ static int mailbox_to_file(struct switchtec_dev *dev, int fd)
 	return 0;
 }
 
-static int mailbox_to_file_gen5(struct switchtec_dev *dev, int fd)
+/*
+ * @brief Get secure boot settings in BL1 for gen6. 
+ * Outside of 
+ * @param[in]  dev	Switchtec device handle
+ * @param[out] state	Current secure boot settings
+ * @return 0 on success, error code on failure
+ * 
+ * Command ID cannot be accessed outside of BL1 phase. Use security_config_get_gen6 
+ * to access the secure settings during MainFW phase.
+*/
+int security_settings_get_gen6(struct switchtec_dev *dev,
+				struct switchtec_security_cfg_state *state)
+{
+	int ret;
+
+	struct sec_cfg_get_struct cmd = {};
+	uint32_t reply_otp[MRPC_MAX_DATA_LEN / sizeof(uint32_t)] = {};
+
+	/* get first 60dwords of OTP content */
+	cmd.subcmd = MRPC_GET_SECURE_OTP;
+	cmd.OTP_dword_offset = 0;
+	cmd.read_dwords = 60;
+
+	cmd.subcmd = MRPC_GET_SECURE_OTP;
+	ret = switchtec_mfg_cmd(dev,MRPC_SECURITY_CONFIG_GET_GEN6, &cmd, sizeof(cmd),
+				 			&reply_otp, cmd.read_dwords * sizeof(uint32_t));
+	if (ret)
+		return ret;
+	
+	state->i2c_cmd_map = (reply_otp[OTP_DWORD_10] & OTP_DWORD_10_SMBUS_SMBRMRPCADDR_MSK) 
+						  >> OTP_DWORD_10_SMBUS_SMBRMRPCADDR_LSB;
+	state->i2c_port = (reply_otp[OTP_DWORD_10] & OTP_DWORD_10_SMBUS_SMBRIF_MSK) 
+					   >> OTP_DWORD_10_SMBUS_SMBRIF_LSB;
+	state->i2c_addr = (reply_otp[OTP_DWORD_10] & OTP_DWORD_10_SMBUS_SMBRATYPE_MSK) 
+					   >> OTP_DWORD_10_SMBUS_SMBRATYPE_LSB;
+	state->i2c_rcvry_address_ocp = (reply_otp[OTP_DWORD_10] & OTP_DWORD_10_SMBUS_SMBROCPADDR_MSK) 
+									>> OTP_DWORD_10_SMBUS_SMBROCPADDR_LSB;
+	state->secsc = (reply_otp[OTP_DWORD_0] & OTP_DWORD_0_PRODUCT_SECSC_MSK) 
+					>> OTP_DWORD_0_PRODUCT_SECSC_LSB;
+
+	/* get 192 dwords of OTP content from offset 656 for keys*/
+	cmd.subcmd = MRPC_GET_SECURE_OTP;
+	cmd.OTP_dword_offset = OTP_MULTI_DWORD_IMAGE_BIAK0;
+	cmd.read_dwords = (SWITCHTEC_KMSK_NUM_GEN6 * SWITCHTEC_KMSK_LEN_DWORDS);
+
+	cmd.subcmd = MRPC_GET_SECURE_OTP;
+	ret = switchtec_mfg_cmd(dev, MRPC_SECURITY_CONFIG_GET_GEN6, &cmd, sizeof(cmd),
+				 			&reply_otp, cmd.read_dwords * sizeof(uint32_t));
+	if (ret)
+		return ret;
+
+	for (int i = 0; i < SWITCHTEC_KMSK_NUM_GEN6; i++) {
+		memcpy(state->otp_key_hash[i],
+			&reply_otp[i * SWITCHTEC_KMSK_LEN_DWORDS],
+			SWITCHTEC_KMSK_LEN_DWORDS * sizeof(uint32_t));
+	}
+
+	return 0;
+}
+
+static int mailbox_to_file_gen56(struct switchtec_dev *dev, int fd)
 {
 	int ret;
 	struct mb_read {
@@ -533,8 +669,11 @@ static int mailbox_to_file_gen5(struct switchtec_dev *dev, int fd)
 	read.subcmd = 0;
 	read.num_to_read = htole32(SWITCHTEC_MB_MAX_ENTRIES);
 
+	enum mrpc_cmd cmd_id = switchtec_is_gen6(dev) ?
+				MRPC_MAILBOX_GET_GEN6 : MRPC_MAILBOX_GET_GEN5;
+
 	do {
-		ret = switchtec_mfg_cmd(dev, MRPC_MAILBOX_GET_GEN5,
+		ret = switchtec_mfg_cmd(dev, cmd_id,
 					&read, sizeof(read),
 					&reply,  sizeof(reply));
 		if (ret)
@@ -560,8 +699,8 @@ static int mailbox_to_file_gen5(struct switchtec_dev *dev, int fd)
  */
 int switchtec_mailbox_to_file(struct switchtec_dev *dev, int fd)
 {
-	if (switchtec_is_gen5(dev))
-		return mailbox_to_file_gen5(dev, fd);
+	if (switchtec_is_gen5(dev) || switchtec_is_gen6(dev))
+		return mailbox_to_file_gen56(dev, fd);
 	else
 		return mailbox_to_file(dev, fd);
 }
@@ -953,6 +1092,8 @@ int switchtec_fw_exec(struct switchtec_dev *dev,
 	cmd.subcmd = MRPC_FW_TX_EXEC;
 	cmd.recovery_mode = recovery_mode;
 
+	if (switchtec_is_gen6(dev))
+		cmd_id = MRPC_FW_TX_GEN6;
 	if (switchtec_is_gen5(dev))
 		cmd_id = MRPC_FW_TX_GEN5;
 
@@ -1072,10 +1213,7 @@ int switchtec_dbg_unlock(struct switchtec_dev *dev, uint32_t serial,
 	} cmd = {};
 	uint32_t cmd_id;
 
-	if (switchtec_is_gen5(dev))
-		cmd_id = MRPC_DBG_UNLOCK_GEN5;
-	else
-		cmd_id = MRPC_DBG_UNLOCK;
+	cmd_id = get_dbg_unlock_id(dev);
 
 	ret = dbg_unlock_send_pubkey(dev, public_key, cmd_id);
 	if (ret)
@@ -1114,10 +1252,7 @@ int switchtec_dbg_unlock_version_update(struct switchtec_dev *dev,
 	} cmd = {};
 	uint32_t cmd_id;
 
-	if (switchtec_is_gen5(dev))
-		cmd_id = MRPC_DBG_UNLOCK_GEN5;
-	else
-		cmd_id = MRPC_DBG_UNLOCK;
+	cmd_id = get_dbg_unlock_id(dev);
 
 	ret = dbg_unlock_send_pubkey(dev, public_key, cmd_id);
 	if (ret)
@@ -1728,6 +1863,43 @@ static int sn_ver_get_gen5(struct switchtec_dev *dev,
 	return 0;
 }
 
+static int sn_ver_get_gen6(struct switchtec_dev *dev,
+						   struct switchtec_sn_ver_info *info)
+{
+	int ret;
+	uint32_t subcmd = 0;
+	struct reply_t {
+		uint32_t UID[16];
+		uint32_t PSID0[4];
+		uint32_t PSID_UID_valid_flags;
+		uint32_t SVNSV_rsvrd;
+		uint32_t bl2_sec_ver;
+		uint32_t rsvrd;
+		uint32_t mainfw_sec_ver;
+		uint32_t svl1_rsvrd;
+		uint32_t svl2_rsvrd;
+		uint32_t dbg_tok_sec_ver_rsvrd;
+		uint32_t kmt_sec_ver_rsvrd;
+	} reply;
+
+	ret = switchtec_mfg_cmd(dev, MRPC_SN_VER_GET_GEN6, &subcmd, 4,
+						    &reply, sizeof(reply));
+	if (ret)
+		return ret;
+
+	info->UID = malloc(sizeof(reply.UID));
+	info->PSID0 = malloc(sizeof(reply.PSID0));
+	memcpy(info->UID, reply.UID, sizeof(reply.UID));
+	memcpy(info->PSID0, reply.PSID0, sizeof(reply.PSID0));
+	info->PSID_UID_valid_flags = reply.PSID_UID_valid_flags;
+	info->ver_bl2 = reply.bl2_sec_ver;
+	info->ver_main = reply.mainfw_sec_ver;
+	info->dbg_tok_sec_ver_rsvrd = reply.dbg_tok_sec_ver_rsvrd;
+	info->kmt_sec_ver_rsvrd = reply.kmt_sec_ver_rsvrd;
+
+	return 0;
+}
+
 /**
  * @brief Get serial number and security version
  * @param[in]  dev	Switchtec device handle
@@ -1737,7 +1909,9 @@ static int sn_ver_get_gen5(struct switchtec_dev *dev,
 int switchtec_sn_ver_get(struct switchtec_dev *dev,
 			 struct switchtec_sn_ver_info *info)
 {
-	if (switchtec_is_gen5(dev))
+	if (switchtec_is_gen6(dev))
+		return sn_ver_get_gen6(dev, info);
+	else if (switchtec_is_gen5(dev))
 		return sn_ver_get_gen5(dev, info);
 	else
 		return sn_ver_get_gen4(dev, info);

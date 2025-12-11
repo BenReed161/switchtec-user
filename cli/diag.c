@@ -159,6 +159,11 @@ static int ltssm_log(int argc, char **argv) {
 	argconfig_parse(argc, argv, CMD_DESC_LTSSM_LOG, opts, &cfg,
 			sizeof(cfg));
 
+	if (cfg.port_id == -1) {
+		fprintf (stderr, "Phyical port ID must be specified\n");
+		return 0;
+	}
+
 	int log_count = 512;
 	if (switchtec_is_gen4(cfg.dev))
 		log_count = 128;
@@ -184,15 +189,27 @@ static int ltssm_log(int argc, char **argv) {
 			switchtec_perror("ltssm_log");
 			return ret;
 		}
-
 		printf("LTSSM Log for Physical Port %d (autowrap ON)\n\n", port);
-		printf("Idx\tDelta Time\tPCIe Rate\tState\n");
-		for(i = 0; i < log_count ; i++) {
-			printf("%3d\t", i);
-			printf("%09x\t", output[i].timestamp);
-			printf("%.1fG\t\t", output[i].link_rate);
-			printf("%s\n", switchtec_ltssm_str(output[i].link_state, 
-							   1, cfg.dev));
+
+		if (switchtec_is_gen6(cfg.dev)) {
+			printf("Idx\tDelta Time\tPCIe Rate\tLink Width\tState\n");
+			for(i = 0; i < log_count ; i++) {
+				printf("%3d\t", i);
+				printf("%09x\t", output[i].timestamp);
+				printf("%.1fG\t\t", output[i].link_rate);
+				printf("x%d\t\t", output[i].link_width);
+				printf("%s\n", switchtec_ltssm_str(output[i].link_state,
+								1, cfg.dev));
+			}
+		} else {
+			printf("Idx\tDelta Time\tPCIe Rate\tState\n");
+			for(i = 0; i < log_count ; i++) {
+				printf("%3d\t", i);
+				printf("%09x\t", output[i].timestamp);
+				printf("%.1fG\t\t", output[i].link_rate);
+				printf("%s\n", switchtec_ltssm_str(output[i].link_state,
+								1, cfg.dev));
+			}
 		}
 	}
 
@@ -1590,6 +1607,7 @@ static const struct argconfig_choice loopback_ltssm_speeds[] = {
 	{"GEN3", SWITCHTEC_DIAG_LTSSM_GEN3, "GEN3 LTSSM Speed"},
 	{"GEN4", SWITCHTEC_DIAG_LTSSM_GEN4, "GEN4 LTSSM Speed"},
 	{"GEN5", SWITCHTEC_DIAG_LTSSM_GEN5, "GEN5 LTSSM Speed"},
+	{"GEN6", SWITCHTEC_DIAG_LTSSM_GEN6, "GEN6 LTSSM Speed"},
 	{}
 };
 
@@ -1657,6 +1675,7 @@ static int loopback(int argc, char **argv)
 		int enable_parallel;
 		int enable_external;
 		int enable_ltssm;
+		int enable_pipe;
 		int speed;
 	} cfg = {
 		.port_id = -1,
@@ -1679,6 +1698,8 @@ static int loopback(int argc, char **argv)
 		 no_argument, "Enable parallel datapath loopback mode in SERDES digital layer (Gen 5)"},
 		{"external", 'e', "", CFG_NONE, &cfg.enable_external, 
 		 no_argument, "Enable external datapath loopback mode in physical layer (Gen 5)"},
+		{"pipe", 'c', "", CFG_NONE, &cfg.enable_pipe,
+		 no_argument, "Enable parallel loopback within Controller (PIPE Tx->Rx) (Gen 6)"},
 		{"speed", 's', "GEN", CFG_CHOICES, &cfg.speed, 
 		 required_argument, "LTSSM Speed (if enabling the LTSSM loopback mode), default: GEN4",
 		 .choices = loopback_ltssm_speeds},
@@ -1699,7 +1720,7 @@ static int loopback(int argc, char **argv)
 
 	if (cfg.disable && (cfg.enable_rx_to_tx || cfg.enable_tx_to_rx ||
 			    cfg.enable_ltssm || cfg.enable_external ||
-			    cfg.enable_parallel)) {
+			    cfg.enable_parallel || cfg.enable_pipe)) {
 		fprintf(stderr,
 			"Must not specify -d / --disable with an enable flag\n");
 		return -1;
@@ -1710,13 +1731,16 @@ static int loopback(int argc, char **argv)
 		return ret;
 
 	if (cfg.disable || cfg.enable_rx_to_tx || cfg.enable_tx_to_rx ||
-	    cfg.enable_ltssm || cfg.enable_external || cfg.enable_parallel) {
+	    cfg.enable_ltssm || cfg.enable_external || cfg.enable_parallel ||
+	    cfg.enable_pipe) {
 		if (cfg.enable_rx_to_tx)
 			enable |= SWITCHTEC_DIAG_LOOPBACK_RX_TO_TX;
 		if (cfg.enable_tx_to_rx)
 			enable |= SWITCHTEC_DIAG_LOOPBACK_TX_TO_RX;
 		if (cfg.enable_ltssm)
 			enable |= SWITCHTEC_DIAG_LOOPBACK_LTSSM;
+		if (cfg.enable_pipe)
+			enable |= SWITCHTEC_DIAG_LOOPBACK_PIPE;
 
 		if (switchtec_is_gen5(cfg.dev)) {
 			if (cfg.enable_rx_to_tx || cfg.enable_tx_to_rx) {
@@ -1726,7 +1750,8 @@ static int loopback(int argc, char **argv)
 		}
 		ret = switchtec_diag_loopback_set(cfg.dev, cfg.port_id, enable,
 						  cfg.enable_parallel, 
-						  cfg.enable_external, 
+						  cfg.enable_external,
+						  cfg.enable_pipe,
 						  cfg.enable_ltssm, cfg.speed);
 		if (ret) {
 			switchtec_perror("loopback_set");
@@ -2250,7 +2275,8 @@ static int rcvr_extended(int argc, char **argv)
 static int refclk(int argc, char **argv)
 {
 	int ret;
-
+	uint8_t stack_info[SWITCHTEC_MAX_STACKS];
+	
 	static struct {
 		struct switchtec_dev *dev;
 		int stack_id;
@@ -2301,7 +2327,6 @@ static int refclk(int argc, char **argv)
 	       cfg.enable ? "Enabled" : "Disabled", cfg.stack_id);
 	
 print_stack_info:
-	uint8_t stack_info[SWITCHTEC_MAX_STACKS];
 	printf("REFCLK Status:\n");
 	ret = switchtec_diag_refclk_status(cfg.dev, stack_info);
 	if (ret) {
