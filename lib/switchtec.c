@@ -471,6 +471,20 @@ static const char *lane_reversal_str(int link_up,
 	}
 }
 
+static const char *lane_reversal_str_gen6(int link_up,
+					  int lane_reversal)
+{
+	if (!link_up)
+		return "N/A";
+
+	switch(lane_reversal) {
+	case 0: return "Normal Lane Ordering";
+	case 1: return "Lane Reversal in effect";
+	default: return "Unknown Lane Ordering";
+	}
+}
+
+
 static void generate_lane_str(struct switchtec_status *s)
 {
 	int i, l;
@@ -498,19 +512,8 @@ static void generate_lane_str(struct switchtec_status *s)
 	}
 }
 
-/**
- * @brief Get the status of all the ports on a switchtec device
- * @param[in]  dev    Switchtec device handle
- * @param[out] status A pointer to an allocated list of port statuses
- * @return The number of ports in the status list or a negative value
- *	on failure
- *
- * This function a allocates memory for the number of ports in the
- * system. The returned \p status structure should be freed with the
- * switchtec_status_free() function.
- */
-int switchtec_status(struct switchtec_dev *dev,
-		     struct switchtec_status **status)
+static int switchtec_status_gen345(struct switchtec_dev *dev,
+				   struct switchtec_status **status)
 {
 	uint64_t port_bitmap = 0;
 	int ret;
@@ -586,6 +589,115 @@ int switchtec_status(struct switchtec_dev *dev,
 	qsort(s, nr_ports, sizeof(*s), compare_status);
 
 	return nr_ports;
+}
+
+static int switchtec_status_gen6(struct switchtec_dev *dev, 
+				struct switchtec_status **status)
+{
+	struct {
+		uint64_t map1;
+		uint16_t map2;
+		uint16_t rsvrd1;
+		uint32_t rsvrd2;
+	} port_bitmap = {
+		.map1 = 0,
+		.map2 = 0
+	};
+
+	int ret;
+	int i, p;
+	int nr_ports = 0;
+	struct switchtec_status *s;
+	int max_ports;
+
+	if (!status) {
+		errno = EINVAL;
+		return -errno;
+	}
+
+	max_ports = switchtec_max_supported_ports(dev);
+
+	struct {
+		uint8_t phys_port_id;
+		uint8_t par_id;
+		uint8_t log_port_id;
+		uint8_t stk_id;
+		uint8_t cfg_lnk_width;
+		uint8_t neg_lnk_width;
+		uint8_t usp_flag;
+		uint8_t linkup_linkrate;
+		uint8_t ltssm_major;
+		uint8_t ltssm_minor;
+		uint8_t lane_reversal;
+		uint8_t first_act_lane;
+	} ports[max_ports];
+
+	ret = switchtec_cmd(dev, MRPC_LNKSTAT, &port_bitmap, sizeof(port_bitmap),
+			    ports, sizeof(ports));
+	if (ret)
+		return -1;
+
+
+	for (i = 0; i < max_ports; i++) {
+		if ((ports[i].stk_id >> 4) > SWITCHTEC_MAX_STACKS)
+			continue;
+		nr_ports++;
+	}
+
+	s = *status = calloc(nr_ports, sizeof(*s));
+	if (!s)
+		return -ENOMEM;
+
+	for (i = 0, p = 0; i < max_ports && p < nr_ports; i++) {
+		if ((ports[i].stk_id >> 4) > SWITCHTEC_MAX_STACKS)
+			continue;
+
+		s[p].port.partition = ports[i].par_id;
+		s[p].port.stack = ports[i].stk_id >> 4;
+		s[p].port.upstream = ports[i].usp_flag;
+		s[p].port.stk_id = ports[i].stk_id & 0xF;
+		s[p].port.phys_id = ports[i].phys_port_id;
+		s[p].port.log_id = ports[i].log_port_id;
+
+		s[p].cfg_lnk_width = ports[i].cfg_lnk_width;
+		s[p].neg_lnk_width = ports[i].neg_lnk_width;
+		s[p].link_up = ports[i].linkup_linkrate >> 7;
+		s[p].link_rate = ports[i].linkup_linkrate & 0x7F;
+		s[p].ltssm = le16toh(ports[i].ltssm_major);
+		s[p].ltssm_str = switchtec_ltssm_str(s[p].ltssm, 1, dev);
+		s[p].lane_reversal = ports[i].lane_reversal;
+		s[p].lane_reversal_str = lane_reversal_str_gen6(s[p].link_up,
+								s[p].lane_reversal);
+		s[p].first_act_lane = ports[i].first_act_lane & 0xF;
+		s[p].acs_ctrl = -1;
+		generate_lane_str(&s[p]);
+
+		p++;
+	}
+
+	qsort(s, nr_ports, sizeof(*s), compare_status);
+
+	return nr_ports;
+}
+
+/**
+ * @brief Get the status of all the ports on a switchtec device
+ * @param[in]  dev    Switchtec device handle
+ * @param[out] status A pointer to an allocated list of port statuses
+ * @return The number of ports in the status list or a negative value
+ *	on failure
+ *
+ * This function a allocates memory for the number of ports in the
+ * system. The returned \p status structure should be freed with the
+ * switchtec_status_free() function.
+ */
+int switchtec_status(struct switchtec_dev *dev,
+		     struct switchtec_status **status)
+{
+	if (switchtec_is_gen6(dev))
+		return switchtec_status_gen6(dev, status);
+	else
+		return switchtec_status_gen345(dev, status);
 }
 
 /**
