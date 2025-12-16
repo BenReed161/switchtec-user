@@ -81,6 +81,11 @@ static const struct argconfig_choice port_eq_prev_speeds[] = {
 	.choices=port_eq_prev_speeds					\
 }
 
+#define OSA_STACK_ID_OPTION {						\
+	"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 		\
+	required_argument,"ID of the stack (0-5), 7 for mangement stack (Gen5). ID of the stack (0-9) (Gen6)", \
+}
+
 static int get_port(struct switchtec_dev *dev, int port_id,
 		    struct switchtec_status *port)
 {
@@ -2653,6 +2658,22 @@ static int linkerr_inject(int argc, char ** argv)
 	return ret;
 }
 
+static int stack_id_check(struct switchtec_dev *dev, int stack_id)
+{
+	if (switchtec_is_gen6(dev)) {
+		if (stack_id < 0 || stack_id > 9)
+			goto invalid_stack;
+	} else {
+		if (stack_id < 0 || (stack_id > 5 && stack_id != 7))
+			goto invalid_stack;
+	}
+	return 0;
+
+invalid_stack:
+	fprintf(stderr, "Invalid stack ID.\n");
+	return -1;
+}
+
 #define CMD_ORDERED_SET_ANALYZER "Ordered set analyzer"
 
 static int osa(int argc, char **argv)
@@ -2665,8 +2686,7 @@ static int osa(int argc, char **argv)
 	} cfg;
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
-		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
-		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		OSA_STACK_ID_OPTION,
 		{"operation", 'o', "0/1/2/3/4/5", CFG_INT, &cfg.operation, 
 		required_argument,"operations:\n- stop:0\n- start:1\n- trigger:2\n- reset:3\n- release:4\n- status:5"},
 		{NULL}};
@@ -2674,10 +2694,9 @@ static int osa(int argc, char **argv)
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, 
 			sizeof(cfg));
 
-	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
-		fprintf(stderr, "Invalid stack ID.\n");
-		return -1;
-	}
+	ret = stack_id_check(cfg.dev, cfg.stack_id);
+	if (ret)
+		return ret;
 
 	if (cfg.operation > 5 || cfg.operation < 0) {
 		printf("Invalid operation!\n");
@@ -2712,8 +2731,7 @@ static int osa_config_type(int argc, char **argv)
 	} cfg;
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
-		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
-		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		OSA_STACK_ID_OPTION,
 		{"lane_mask", 'm', "LANE_MASK", CFG_STRING, &cfg.lane_mask, 
 		required_argument,
 		"16 bit lane mask, 1 enables the triggering for that specified lane. " \
@@ -2724,23 +2742,22 @@ static int osa_config_type(int argc, char **argv)
 		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x\nBit 0 : tx\nBit 1 : rx"},
 		{"link_rate", 'r', "LINK_RATE", CFG_STRING, &cfg.link_rate, 
 		required_argument,
-		"5 bit mask for link rate, 1 enables the corrisponding link rate. " \
+		"6 bit mask for link rate, 1 enables the corrisponding link rate. " \
 		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with " \
-		"0x\nBit 0 : Gen1\nBit 1 : Gen2\nBit 2 : Gen3\nBit 3 : Gen4\nBit 4 : Gen5"},
+		"0x\nBit 0 : Gen1\nBit 1 : Gen2\nBit 2 : Gen3\nBit 3 : Gen4\nBit 4 : Gen5\nBit 5 : Gen6"},
 		{"os_types", 't', "OS_TYPES", CFG_STRING, &cfg.os_types, 
 		required_argument,
-		"4 bit mask for OS types, 1 enables the corrisponding OS type. "\
-		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with "\
-		"0x\nBit 0 : TS1\nBit 1 : TS2\nBit 2 : FTS\nBit 3 : CTL_SKP"},
+		"4 bit mask for OS types, 5 bit mask Gen6 only. 1 enables the corrisponding OS type. "\
+		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x."\
+		"\n\t\tGen5\tGen6\nBit 0\tTS1\tTS0\nBit 1\tTS2\tTS1\nBit 2\tFTS\tTS2\nBit 3\tCTL_SKP\tFTS\nBit 4\t----\tCTL_SKP"},
 		{NULL}};
 	
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_CONF, opts, &cfg, 
 			sizeof(cfg));
 
-	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
-		fprintf(stderr, "Invalid stack ID.\n");
-		return -1;
-	}
+	ret = stack_id_check(cfg.dev, cfg.stack_id);
+	if (ret)
+		return ret;
 
 	if (cfg.lane_mask) {
 		ret = convert_hex_str(cfg.lane_mask, &lane_mask, &num_dwords, 4);
@@ -2770,8 +2787,14 @@ static int osa_config_type(int argc, char **argv)
 			fprintf(stderr, "Error with link rate mask.\n");
 			return -1;
 		}
-		if (*link_rate_mask > 31) {
-			fprintf(stderr, "Link rate cannot be greater than 0x1F.\n");
+		if ((*link_rate_mask > 31 || (*link_rate_mask | 0x20)) && switchtec_is_gen5(cfg.dev)) {
+			fprintf(stderr, "Cannot enable Gen6 link rate or mask greater than 0x1F (Gen5 Switchtec devices).\n");
+			free(lane_mask);
+			free(direction_mask);
+			free(link_rate_mask);
+			return -1;
+		} else if (*link_rate_mask > 63 && switchtec_is_gen6(cfg.dev)) {
+			fprintf(stderr, "Link rate cannot be greater than 0x3F (Gen6 Switchtec devices).\n");
 			free(lane_mask);
 			free(direction_mask);
 			free(link_rate_mask);
@@ -2842,9 +2865,9 @@ static int osa_config_pat(int argc, char **argv)
 		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x\nBit 0 : tx\nBit 1 : rx"},
 		{"link_rate", 'r', "LINK_RATE", CFG_STRING, &cfg.link_rate, 
 		required_argument,
-		"5 bit mask for link rate, 1 enables the corrisponding link rate. "\
+		"6 bit mask for link rate, 1 enables the corrisponding link rate. "\
 		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value "\
-		"prefixed with 0x\nBit 0 : Gen1\nBit 1 : Gen2\nBit 2 : Gen3\nBit 3 : Gen4\nBit 4 : Gen5"},
+		"prefixed with 0x\nBit 0 : Gen1\nBit 1 : Gen2\nBit 2 : Gen3\nBit 3 : Gen4\nBit 4 : Gen5\nBit 5 : Gen6"},
 		{"dwords_value", 'V', "\"val_dword0 val_dword1 etc.\"", CFG_STRING, 
 		&cfg.value_dwords, required_argument, 
 		"(Maximum 4 DWs) Dwords should be surrounded by quotations, each "\
@@ -2858,10 +2881,9 @@ static int osa_config_pat(int argc, char **argv)
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_CONF, opts, &cfg, 
 			sizeof(cfg));
 	
-	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
-		fprintf(stderr, "Invalid stack ID.\n");
-		return -1;
-	}
+	ret = stack_id_check(cfg.dev, cfg.stack_id);
+	if (ret)
+		return ret;
 
 	if (cfg.lane_mask) {
 		ret = convert_hex_str(cfg.lane_mask, &lane_mask, &num_dwords, 4);
@@ -2891,8 +2913,14 @@ static int osa_config_pat(int argc, char **argv)
 			fprintf(stderr, "Error with link rate mask.\n");
 			return -1;
 		}
-		if (*link_rate_mask > 31) {
-			fprintf(stderr, "Link rate cannot be greater than 0x1F.\n");
+		if ((*link_rate_mask > 31 || (*link_rate_mask | 0x20)) && switchtec_is_gen5(cfg.dev)) {
+			fprintf(stderr, "Cannot enable Gen6 link rate or mask greater than 0x1F (Gen5 Switchtec devices).\n");
+			free(lane_mask);
+			free(direction_mask);
+			free(link_rate_mask);
+			return -1;
+		} else if (*link_rate_mask > 63 && switchtec_is_gen6(cfg.dev)) {
+			fprintf(stderr, "Link rate cannot be greater than 0x3F (Gen6 Switchtec devices).\n");
 			free(lane_mask);
 			free(direction_mask);
 			free(link_rate_mask);
@@ -2961,8 +2989,7 @@ static int osa_config_misc(int argc, char **argv)
 	} cfg;
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
-		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
-		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		OSA_STACK_ID_OPTION,
 		{"trigger_en", 't', "ENABLED", CFG_STRING, &cfg.trigger_en,
 		required_argument,
 		"3 bit mask for trigger enable, 1 enables the correisponding trigger. "\
@@ -2973,10 +3000,9 @@ static int osa_config_misc(int argc, char **argv)
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_MISC_CONF, 
 			opts, &cfg, sizeof(cfg));
 
-	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
-		fprintf(stderr, "Invalid stack ID.\n");
-		return -1;
-	}
+	ret = stack_id_check(cfg.dev, cfg.stack_id);
+	if (ret)
+		return ret;
 
 	if (cfg.trigger_en) {
 		ret = convert_hex_str(cfg.trigger_en, &trigger_mask, 
@@ -3003,7 +3029,7 @@ static int osa_config_misc(int argc, char **argv)
 
 #define CMD_ORDERED_SET_ANALYZER_CAP_CTRL "Ordered set analyzer capture control"
 
-static int osa_capture_contol(int argc, char **argv)
+static int osa_capture_control(int argc, char **argv)
 {
 	int ret = 0;
 	uint32_t * os_type_mask = NULL;
@@ -3029,8 +3055,7 @@ static int osa_capture_contol(int argc, char **argv)
 
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
-		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
-		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		OSA_STACK_ID_OPTION,
 		{"lane_mask", 'm', "LANE_MASK", CFG_STRING, &cfg.lane_mask, 
 		required_argument,
 		"16 bit lane mask, 1 enables the triggering for that specified lane. "\
@@ -3041,7 +3066,7 @@ static int osa_capture_contol(int argc, char **argv)
 		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x\nBit 0 : tx\nBit 1 : rx"},
 		{"drop_single_os", 'o', "", CFG_NONE, &cfg.drop_single_os, 
 		no_argument, 
-		"When set to 1, the single TS1, TS2, FTS, and CTL_SKP OS's are excluded from the capture."},
+		"When set to 1, the single TS0(Gen6), TS1, TS2, FTS, and CTL_SKP OS's are excluded from the capture."},
 		{"stop_mode", 'S', "", CFG_NONE, &cfg.stop_mode, 
 		no_argument, 
 		"Controls when the OSA stops capturing. disabled: any lane has stopped, enabled: all lanes have stopped. (Default: disabled)"},
@@ -3055,17 +3080,17 @@ static int osa_capture_contol(int argc, char **argv)
 		"Max 256 entries.\n(Required if disabling --snapshot_mode -s)"},
 		{"os_types", 't', "OS_TYPES", CFG_STRING, &cfg.os_types, 
 		required_argument,
-		"8 bit mask for OS types, 1 enables the corrisponding OS type. "\
-		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed "\
-		"with 0x\nBit 0 : TS1\nBit 1 : TS2\nBit 2 : FTS\nBit 3 : CTL_SKP\nBit 4 : SKP\nBit 5 : EIEOS\nBit 6 : EIOS\nBit 7 : ERR_OS"},
+		"4 bit mask for OS types, 5 bit mask Gen6 only. 1 enables the corrisponding OS type. "\
+		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x."\
+		"\n\t\tGen5\tGen6\nBit 0\tTS1\tTS0\nBit 1\tTS2\tTS1\nBit 2\tFTS\tTS2\nBit 3\tCTL_SKP\tFTS\n" \
+		"Bit 4\tSKP\tCTL_SKP\nBit 5\tEIEOS\tSKP\nBit 6\tEIOS\tEIEOS\nBit 7\tERR_OS\tEIOS\nBit 8\t----\tERR_OS"},
 		{NULL}};
 	
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_CAP_CTRL, opts, &cfg, sizeof(cfg));
 
-	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
-		fprintf(stderr, "Invalid stack ID.\n");
-		return -1;
-	}
+	ret = stack_id_check(cfg.dev, cfg.stack_id);
+	if (ret)
+		return ret;
 
 	if (cfg.post_trig_entries && cfg.snapshot_mode) {
 		fprintf(stderr, "Cannot enable snapshot mode and set the number of post trigger entries.\n");
@@ -3134,17 +3159,15 @@ static int osa_dump_config(int argc, char **argv)
 	} cfg;
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
-		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
-		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		OSA_STACK_ID_OPTION,
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, 
 			sizeof(cfg));
 
-	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
-		fprintf(stderr, "Invalid stack ID.\n");
-		return -1;
-	}
+	ret = stack_id_check(cfg.dev, cfg.stack_id);
+	if (ret)
+		return ret;
 
 	ret = switchtec_osa_dump_conf(cfg.dev, cfg.stack_id);
 	if (ret) {
@@ -3167,8 +3190,7 @@ static int osa_dump_data(int argc, char **argv)
 	} cfg;
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
-		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
-		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		OSA_STACK_ID_OPTION,
 		{"lane", 'l', "lane", CFG_INT, &cfg.lane, 
 		required_argument,"lane ID"},
 		{"direction", 'd', "0/1", CFG_INT, &cfg.direction, 
@@ -3178,10 +3200,9 @@ static int osa_dump_data(int argc, char **argv)
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, 
 			sizeof(cfg));
 	
-	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
-		fprintf(stderr, "Invalid stack ID.\n");
-		return -1;
-	}
+	ret = stack_id_check(cfg.dev, cfg.stack_id);
+	if (ret)
+		return ret;
 
 	if (cfg.direction > 1) {
 		fprintf(stderr, "Direction must be either 0 or 1\n");
@@ -3217,7 +3238,7 @@ static const struct cmd commands[] = {
 	CMD(osa_config_type, 	CMD_ORDERED_SET_ANALYZER_CONF),
 	CMD(osa_config_pat,	CMD_ORDERED_SET_ANALYZER_PAT_CONF),
 	CMD(osa_config_misc,	CMD_ORDERED_SET_ANALYZER_MISC_CONF),
-	CMD(osa_capture_contol, CMD_ORDERED_SET_ANALYZER_CAP_CTRL),
+	CMD(osa_capture_control, CMD_ORDERED_SET_ANALYZER_CAP_CTRL),
 	CMD(osa_dump_config,	CMD_ORDERED_SET_ANALYZER_DUMP_CONF),
 	CMD(osa_dump_data,	CMD_ORDERED_SET_ANALYZER_DUMP_DATA),
 	{}
