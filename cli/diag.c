@@ -1767,6 +1767,20 @@ static int loopback(int argc, char **argv)
 	return print_loopback_mode(cfg.dev, cfg.port_id);
 }
 
+static const struct argconfig_choice all_pattern_types[] = {
+	{"PRBS7",   SWITCHTEC_DIAG_PATTERN_PRBS_7,  "PRBS 7"},
+	{"PRBS11",  SWITCHTEC_DIAG_PATTERN_PRBS_11, "PRBS 11"},
+	{"PRBS23",  SWITCHTEC_DIAG_PATTERN_PRBS_23, "PRBS 23"},
+	{"PRBS31",  SWITCHTEC_DIAG_PATTERN_PRBS_31, "PRBS 31"},
+	{"PRBS9",   SWITCHTEC_DIAG_PATTERN_PRBS_9,  "PRBS 9"},
+	{"PRBS15",  SWITCHTEC_DIAG_PATTERN_PRBS_15, "PRBS 15"},
+	{"PRBS5",   SWITCHTEC_DIAG_GEN_5_PATTERN_PRBS_5,  "PRBS 5 (Gen 5)"},
+	{"PRBS20",  SWITCHTEC_DIAG_GEN_5_PATTERN_PRBS_20, "PRBS 20 (Gen 5)"},
+	{"PRBS13",  SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_13, "PRBS 13 (Gen 6)"},
+	{"52UI",    SWITCHTEC_DIAG_GEN_6_PATTERN_PCIE_52_UI_JIT, "PCIe 52UI Jitter (Gen 6)"},
+	{}
+};
+
 static const struct argconfig_choice pattern_types[] = {
 	{"PRBS7",   SWITCHTEC_DIAG_PATTERN_PRBS_7,  "PRBS 7"},
 	{"PRBS11",  SWITCHTEC_DIAG_PATTERN_PRBS_11, "PRBS 11"},
@@ -1779,12 +1793,25 @@ static const struct argconfig_choice pattern_types[] = {
 	{}
 };
 
+static const struct argconfig_choice pattern_types_gen6[] = {
+	{"PRBS7",   SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_7,  "PRBS 7"},
+	{"PRBS11",  SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_9, "PRBS 9"},
+	{"PRBS23",  SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_11, "PRBS 11"},
+	{"PRBS31",  SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_13, "PRBS 13"},
+	{"PRBS9",   SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_15,  "PRBS 15"},
+	{"PRBS15",  SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_23, "PRBS 23"},
+	{"PRBS5",   SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_31,  "PRBS 31"},
+	{"PRBS20",  SWITCHTEC_DIAG_GEN_6_PATTERN_PCIE_52_UI_JIT, "PCIe 52UI Jitter"},
+	{}
+};
+
 static const struct argconfig_choice pat_gen_link_speeds[] = {
 	{"GEN1", SWITCHTEC_DIAG_PAT_LINK_GEN1, "GEN1 Pattern Generator Speed"},
 	{"GEN2", SWITCHTEC_DIAG_PAT_LINK_GEN2, "GEN2 Pattern Generator Speed"},
 	{"GEN3", SWITCHTEC_DIAG_PAT_LINK_GEN3, "GEN3 Pattern Generator Speed"},
 	{"GEN4", SWITCHTEC_DIAG_PAT_LINK_GEN4, "GEN4 Pattern Generator Speed"},
 	{"GEN5", SWITCHTEC_DIAG_PAT_LINK_GEN5, "GEN5 Pattern Generator Speed"},
+	{"GEN6", SWITCHTEC_DIAG_PAT_LINK_GEN6, "GEN6 Pattern Generator Speed"},
 };
 
 static const char *pattern_to_str(enum switchtec_diag_pattern type)
@@ -1792,6 +1819,18 @@ static const char *pattern_to_str(enum switchtec_diag_pattern type)
 	const struct argconfig_choice *s;
 
 	for (s = pattern_types; s->name; s++) {
+		if (s->value == type)
+			return s->name;
+	}
+
+	return "UNKNOWN";
+}
+
+static const char *pattern_to_str_gen6(enum switchtec_diag_pattern_gen6 type)
+{
+	const struct argconfig_choice *s;
+
+	for (s = pattern_types_gen6; s->name; s++) {
 		if (s->value == type)
 			return s->name;
 	}
@@ -1816,6 +1855,7 @@ static int print_pattern_mode(struct switchtec_dev *dev,
 {
 	enum switchtec_diag_pattern gen_pat, mon_pat;
 	int gen_pat_gen5, mon_pat_gen5;
+	enum switchtec_diag_pattern_gen6 mon_pat_gen6, gen_pat_gen6;
 	unsigned long long err_cnt;
 	int ret, lane_id;
 	int err = 0;
@@ -1826,6 +1866,7 @@ static int print_pattern_mode(struct switchtec_dev *dev,
 		return -1;
 	}
 	gen_pat_gen5 = gen_pat;
+	gen_pat_gen6 = gen_pat;
 	if (gen_pat_gen5 == SWITCHTEC_DIAG_GEN_5_PATTERN_PRBS_DISABLED) {
 		fprintf(stderr, "!! The pattern generator is disabled on either the TX or RX port\n");
 		err = 1;
@@ -1834,6 +1875,7 @@ static int print_pattern_mode(struct switchtec_dev *dev,
 	ret = switchtec_diag_pattern_mon_get(dev, port_id, 0, &mon_pat, 
 					     &err_cnt);
 	mon_pat_gen5 = mon_pat;
+	mon_pat_gen6 = mon_pat;
 	if (ret == ERR_PAT_MON_IS_DISABLED || mon_pat_gen5 == SWITCHTEC_DIAG_GEN_5_PATTERN_PRBS_DISABLED) {
 		fprintf(stderr, "!! The pattern monitor is disabled on either the TX or RX port\n");
 		err = 1;
@@ -1849,15 +1891,22 @@ static int print_pattern_mode(struct switchtec_dev *dev,
 	}
 
 	printf("Port: %d\n", port_id);
-	if (gen_pat == SWITCHTEC_DIAG_PATTERN_PRBS_DISABLED && switchtec_is_gen4(dev))
+	if (gen_pat == SWITCHTEC_DIAG_PATTERN_PRBS_DISABLED && switchtec_is_gen4(dev)) {
 		printf("  Generator: Disabled\n");
-	else
-		printf("  Generator: %s\n", pattern_to_str(gen_pat));
+	} else {
+		if (switchtec_is_gen6(dev))
+			printf("  Generator: %s\n", pattern_to_str_gen6(gen_pat_gen6));
+		else
+			printf("  Generator: %s\n", pattern_to_str(gen_pat));
+	}
 
 	if (mon_pat == SWITCHTEC_DIAG_PATTERN_PRBS_DISABLED && switchtec_is_gen4(dev)) {
 		printf("  Monitor: Disabled\n");
 	} else {
-		printf("  Monitor: %-20s\n", pattern_to_str(mon_pat));
+		if (switchtec_is_gen6(dev))
+			printf("  Monitor: %-20s\n", pattern_to_str_gen6(mon_pat_gen6));
+		else
+			printf("  Monitor: %-20s\n", pattern_to_str(mon_pat));
 		printf("    Lane %-2d    Errors: 0x%llx\n", 0, err_cnt);
 		for (lane_id = 1; lane_id < port->cfg_lnk_width; lane_id++) {
 			ret = switchtec_diag_pattern_mon_get(dev, port_id,
@@ -1896,7 +1945,7 @@ static int pattern(int argc, char **argv)
 		int link_speed;
 	} cfg = {
 		.port_id = -1,
-		.pattern = SWITCHTEC_DIAG_PATTERN_PRBS_31,
+		.pattern = SWITCHTEC_DIAG_PATTERN_PRBS_7,
 	};
 
 	const struct argconfig_options opts[] = {
@@ -1915,8 +1964,8 @@ static int pattern(int argc, char **argv)
 		 "Enable Pattern Monitor on specified port"},
 		{"pattern", 't', "PATTERN", CFG_CHOICES, &cfg.pattern,
 		 required_argument,
-		 "pattern to generate or monitor for (default: PRBS31)",
-		 .choices = pattern_types},
+		 "pattern to generate or monitor for (default: PRBS7)",
+		 .choices = all_pattern_types},
 		{"speed", 's', "SPEED", CFG_CHOICES, &cfg.link_speed,
 		 required_argument, 
 		 "link speed that applies to the pattern generator (default: GEN1)",
@@ -1928,6 +1977,26 @@ static int pattern(int argc, char **argv)
 	if (cfg.link_speed && cfg.monitor) {
 		fprintf(stderr,
 			"Cannot enable link speed -s / --speed on pattern monitor\n");
+		return -1;
+	}
+
+	if (cfg.pattern == SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_13 && !switchtec_is_gen6(cfg.dev)) {
+		fprintf(stderr, "Cannot set PRBS 13 pattern for non Gen6 Switchtec device.\n");
+		return -1;
+	}
+
+	if (cfg.pattern == SWITCHTEC_DIAG_GEN_6_PATTERN_PCIE_52_UI_JIT && !switchtec_is_gen6(cfg.dev)) {
+		fprintf(stderr, "Cannot set PCIe 52 UI Jitter pattern for non Gen6 Switchtec device.\n");
+		return -1;
+	}
+
+	if (cfg.pattern == SWITCHTEC_DIAG_GEN_5_PATTERN_PRBS_5 && !switchtec_is_gen5(cfg.dev)) {
+		fprintf(stderr, "Cannot set PRBS 5 pattern for non Gen6 Switchtec device.\n");
+		return -1;
+	}
+
+	if (cfg.pattern == SWITCHTEC_DIAG_GEN_5_PATTERN_PRBS_20 && !switchtec_is_gen5(cfg.dev)) {
+		fprintf(stderr, "Cannot set PRBS 20 pattern for non Gen6 Switchtec device.\n");
 		return -1;
 	}
 	
@@ -1965,12 +2034,17 @@ static int pattern(int argc, char **argv)
 			switchtec_perror("pattern_mon_set");
 			return -1;
 		}
-		if (cfg.disable)
+		if (cfg.disable) {
 			printf("Disabled pattern monitor on port %d\n",
 				cfg.port_id);
-		else
-			printf("Pattern monitor set for port %d with pattern type %s\n", 
-				cfg.port_id, pattern_to_str(cfg.pattern));
+		} else {
+			if (switchtec_is_gen6(cfg.dev))
+				printf("Pattern monitor set for port %d with pattern type %s\n", 
+					cfg.port_id, pattern_to_str_gen6(cfg.pattern));
+			else
+				printf("Pattern monitor set for port %d with pattern type %s\n", 
+					cfg.port_id, pattern_to_str(cfg.pattern));
+		}
 	}
 
 	if (cfg.generate) {
