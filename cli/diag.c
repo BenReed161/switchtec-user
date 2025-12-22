@@ -221,6 +221,33 @@ static int ltssm_log(int argc, char **argv) {
 	return ret;
 }
 
+static const struct argconfig_choice data_mode_choices[] = {
+	{"ADC", SWITCHTEC_DIAG_EYE_ADC,
+	 "ADC data mode"},
+	{"FFE", SWITCHTEC_DIAG_EYE_FFE,
+	 "FFE eye data mode"},
+	{"DFE", SWITCHTEC_DIAG_EYE_DFE,
+	 "enumated DFE data eye data mode"},
+	{}
+};
+
+static const struct argconfig_choice eye_modes_gen6[] = {
+	{"FULL", SWITCHTEC_DIAG_EYE_FULL,
+	 "the full eye diagram"},
+	{"INTERLEAVE", SWITCHTEC_DIAG_EYE_INTERLEAVE,
+	 "interleaver eye diagram"},
+	{"SAR", SWITCHTEC_DIAG_EYE_SAR,
+	 "interleaver eye diagram"},
+	{}
+};
+
+static const struct argconfig_choice hstep_choices[] = {
+	{"ultra-fine", SWITCHTEC_DIAG_EYE_ULTRA_FINE, "ultra-fine"},
+	{"fine", SWITCHTEC_DIAG_EYE_FINE, "fine"},
+	{"medium", SWITCHTEC_DIAG_EYE_MEDIUM, "medium"},
+	{"coarse", SWITCHTEC_DIAG_EYE_COARSE, "coarse"},
+};
+
 static const struct argconfig_choice eye_modes[] = {
 	{"RAW", SWITCHTEC_DIAG_EYE_RAW,
 	 "raw data mode (slow, more accurate)"},
@@ -1248,7 +1275,8 @@ static double *eye_observe_dev(struct switchtec_dev *dev, int port_id,
 		goto out_err;
 	}
 
-	ret = switchtec_diag_eye_start(dev, lane_mask, X, Y, interval, 0);
+	ret = switchtec_diag_eye_start(dev, lane_mask, X, Y, interval, 
+				       0, 0, 0, 0, 0, 0, 0, 0);
 	if (ret) {
 		switchtec_perror("eye_start");
 		goto out_err;
@@ -1355,7 +1383,10 @@ static int eye_graph(enum output_format fmt, struct range *X, struct range *Y,
 
 static double *eye_capture_dev_gen5(struct switchtec_dev *dev,
 				    int port_id, int lane_id, int num_lanes,
-				    int capture_depth, int* num_phases, int* gen)
+				    int capture_depth, int* num_phases, int* gen, 
+				    int sar_sel, int intleav_sel, int hstep, 
+				    int data_mode, int eye_mode, uint64_t refclk,
+				    int vstep)
 {
 	int bin, j, ret, first_lane, num_phases_l, stride;
 	int lane_mask[4] = {};
@@ -1371,7 +1402,8 @@ static double *eye_capture_dev_gen5(struct switchtec_dev *dev,
 	}
 
 	ret = switchtec_diag_eye_start(dev, lane_mask, NULL, NULL, 0, 
-				       capture_depth);
+				       capture_depth, sar_sel, intleav_sel, hstep,
+				       data_mode, eye_mode, refclk, vstep);
 	if (ret) {
 		switchtec_perror("eye_run");
 		return NULL;
@@ -1432,6 +1464,12 @@ static int eye(int argc, char **argv)
 		const char *plot_filename;
 		FILE *crosshair_file;
 		const char *crosshair_filename;
+		int eye_modes_gen6;
+		int hstep;
+		int sar_sel;
+		int intleav_sel;
+		uint64_t refclk;
+		int data_mode;
 	} cfg = {
 		.fmt = FMT_DEFAULT,
 		.port_id = -1,
@@ -1446,6 +1484,12 @@ static int eye(int argc, char **argv)
 		.y_range.end = 255,
 		.y_range.step = 5,
 		.step_interval = 1,
+		.hstep = 1,
+		.sar_sel = 10,
+		.intleav_sel = 0,
+		.refclk = 0,
+		.data_mode = SWITCHTEC_DIAG_EYE_ADC,
+		.eye_modes_gen6 = SWITCHTEC_DIAG_EYE_FULL,
 	};
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION_OPTIONAL,
@@ -1460,6 +1504,12 @@ static int eye(int argc, char **argv)
 		{"mode", 'm', "MODE", CFG_CHOICES, &cfg.mode,
 		 required_argument, "data mode for the capture",
 		 .choices=eye_modes},
+		{"mode-gen6", 'M', "MODE", CFG_CHOICES, &cfg.mode,
+		 required_argument, "eye mode for the capture for gen6",
+		 .choices=eye_modes_gen6},
+		{"data-mode", 'd', "MODE", CFG_CHOICES, &cfg.data_mode,
+		 required_argument, "data mode for the eye capture gen6",
+		 .choices=data_mode_choices},
 		{"num-lanes", 'n', "NUM", CFG_POSITIVE, &cfg.num_lanes,
 		 required_argument,
 		 "number of lanes to capture, if greater than one, format must be csv (default: 1)"},
@@ -1483,6 +1533,15 @@ static int eye(int argc, char **argv)
 		 required_argument, "step interval in ms (default: 1ms)"},
 		{"capture-depth", 'd', "NUM", CFG_POSITIVE, &cfg.capture_depth,
 		 required_argument, "capture depth (6 to 40; default: 24)"},
+		{"h-step", 'H', "NUM", CFG_CHOICES, &cfg.hstep,
+		 required_argument, "Granularity of the X-axis Gen 6 only", 
+		 .choices=hstep_choices},
+		{"sar-sel", 'e', "NUM", CFG_NONNEGATIVE, &cfg.sar_sel,
+		 required_argument, "Eye scan for a particular slice (10 to 15) Gen 6 only"},
+		{"intleav-sel", 'I', "NUM", CFG_NONNEGATIVE, &cfg.intleav_sel,
+		 required_argument, "Eye scan for a particular interleave (0 to 3) Gen6 only"},
+		{"refclk", 'r', "NUM", CFG_NONNEGATIVE, &cfg.refclk, required_argument,
+		 "Configures the number of ref clk cycles used to sample the data (0 to 48 bit num max) Gen 6 only"},
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_DESC_EYE, opts, &cfg,
@@ -1569,11 +1628,14 @@ static int eye(int argc, char **argv)
 	}
 
 	if (!pixels) {
-		if (switchtec_is_gen5(cfg.dev)) {
+		if (switchtec_is_gen5(cfg.dev) || switchtec_is_gen6(cfg.dev)) {
 			pixels = eye_capture_dev_gen5(cfg.dev, cfg.port_id, 
 						      cfg.lane_id, cfg.num_lanes, 
 						      cfg.capture_depth, 
-						      &num_phases, &gen);
+						      &num_phases, &gen, cfg.sar_sel,
+						      cfg.intleav_sel, cfg.hstep,
+						      cfg.data_mode, cfg.eye_modes_gen6,
+						      cfg.refclk, cfg.y_range.step);
 			if (!pixels)
 				return -1;
 

@@ -252,6 +252,23 @@ struct switchtec_gen5_diag_eye_run_in {
 	uint32_t lane_mask[4];
 };
 
+struct switchtec_gen6_diag_eye_run_in {
+	uint8_t sub_cmd;
+	uint8_t resvd1;
+	uint8_t timeout_disable;
+	uint8_t resvd2;
+	uint32_t lane_mask[4];
+	uint8_t sar_sel;
+	uint8_t intleav_sel;
+	uint8_t vstep;
+	int8_t hstep;
+	uint8_t data_mode;
+	uint8_t eye_mode;
+	uint16_t resvd3;
+	uint32_t ref_timer_lwr;
+	uint32_t ref_timer_upp;
+};
+
 struct switchtec_diag_cross_hair_in {
 	uint8_t sub_cmd;
 	uint8_t lane_id;

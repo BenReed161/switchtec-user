@@ -1519,6 +1519,25 @@ enum switchtec_diag_eye_data_mode {
 	SWITCHTEC_DIAG_EYE_RATIO,
 };
 
+enum switchtec_diag_eye_data_mode_gen6 {
+	SWITCHTEC_DIAG_EYE_ADC,
+	SWITCHTEC_DIAG_EYE_FFE,
+	SWITCHTEC_DIAG_EYE_DFE,
+};
+
+enum switchtec_diag_eye_mode_gen6 {
+	SWITCHTEC_DIAG_EYE_FULL,
+	SWITCHTEC_DIAG_EYE_INTERLEAVE,
+	SWITCHTEC_DIAG_EYE_SAR,
+};
+
+enum switchtec_diag_eye_h_step {
+	SWITCHTEC_DIAG_EYE_ULTRA_FINE = 1,
+	SWITCHTEC_DIAG_EYE_FINE = 2,
+	SWITCHTEC_DIAG_EYE_MEDIUM = 3,
+	SWITCHTEC_DIAG_EYE_COARSE = 4,
+};
+
 struct switchtec_gen5_diag_eye_status_in {
 	uint8_t sub_cmd;
 	uint8_t resvd1[3];
@@ -1645,7 +1664,9 @@ int switchtec_diag_eye_read(struct switchtec_dev *dev, int lane_id, int bin,
 		            int* num_phases, double* ber_data);
 int switchtec_diag_eye_start(struct switchtec_dev *dev, int lane_mask[4],
 			     struct range *x_range, struct range *y_range,
-			     int step_interval, int capture_depth);
+			     int step_interval, int capture_depth, int sar_sel,
+			     int intleav_sel, int hstep, int data_mode, 
+			     int eye_mode, uint64_t refclk, int vstep);
 int switchtec_diag_eye_fetch(struct switchtec_dev *dev, double *pixels,
 			     size_t pixel_cnt, int *lane_id);
 int switchtec_diag_eye_cancel(struct switchtec_dev *dev);

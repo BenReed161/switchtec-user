@@ -281,7 +281,9 @@ int switchtec_diag_eye_read(struct switchtec_dev *dev, int lane_id,
  */
 int switchtec_diag_eye_start(struct switchtec_dev *dev, int lane_mask[4],
 			     struct range *x_range, struct range *y_range,
-			     int step_interval, int capture_depth)
+			     int step_interval, int capture_depth, int sar_sel,
+			     int intleav_sel, int hstep, int data_mode, 
+			     int eye_mode, uint64_t refclk, int vstep)
 {
 	int err, ret;
 	if (switchtec_is_gen5(dev)) {
@@ -293,6 +295,27 @@ int switchtec_diag_eye_start(struct switchtec_dev *dev, int lane_mask[4],
 			.lane_mask[1] = lane_mask[1],
 			.lane_mask[2] = lane_mask[2],
 			.lane_mask[3] = lane_mask[3],
+		};
+
+		ret = switchtec_diag_eye_cmd_gen5(dev, &in, sizeof(in));
+		err = errno;
+		errno = err;
+		return ret;
+	} else if (switchtec_is_gen6(dev)) {
+		struct switchtec_gen6_diag_eye_run_in in = {
+			.sub_cmd = MRPC_EYE_CAP_RUN_GEN6,
+			.timeout_disable = 1,
+			.lane_mask[0] = lane_mask[0],
+			.lane_mask[1] = lane_mask[1],
+			.lane_mask[2] = lane_mask[2],
+			.lane_mask[3] = lane_mask[3],
+			.sar_sel = sar_sel,
+			.intleav_sel = intleav_sel,
+			.vstep = vstep,
+			.data_mode = data_mode,
+			.eye_mode = eye_mode,
+			.ref_timer_lwr = refclk & 0xFFFFFFFF,
+			.ref_timer_upp = refclk >> 32,
 		};
 
 		ret = switchtec_diag_eye_cmd_gen5(dev, &in, sizeof(in));
