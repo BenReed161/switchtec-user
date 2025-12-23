@@ -475,21 +475,23 @@ static int info(int argc, char **argv)
 
 		printf("----------------- UID info --------------------------------\n");
 		printf("Device Unique ID: \t\t\t0x");
-		for (int i = 0; i < SWITCHTEC_UID_DWORD_S; i++) {
-			printf("%08X", *sn_info.UID);
+		printf("%08X\n", *sn_info.UID);
+		sn_info.UID++;
+		for (int i = 1; i < SWITCHTEC_UID_DWORD_S; i++) {
+			printf("\t\t\t\t\t  %08X\n", *sn_info.UID);
 			sn_info.UID++;
 		}
-		printf("\n");
 		printf("Status: \t\t\t\t%s\n", status[(sn_info.PSID_UID_valid_flags >> 4) & 0x3]);
 		printf("Mask Read Mask Enable: \t\t\t0x%0x\n", (sn_info.PSID_UID_valid_flags >> 6) & 0x1);
 		printf("Read Mask Request Enable: \t\t0x%0x\n", (sn_info.PSID_UID_valid_flags >> 7) & 0x1);
 		printf("----------------- PSID info -------------------------------\n");
 		printf("Device PSID: \t\t\t\t0x");
-		for (int i = 0; i < SWITCHTEC_PSID_DWORD_S; i++) {
-			printf("%08X", *sn_info.PSID0);
+		printf("%08X\n", *sn_info.PSID0);
+		sn_info.PSID0++;
+		for (int i = 1; i < SWITCHTEC_PSID_DWORD_S; i++) {
+			printf("\t\t\t\t\t  %08X\n", *sn_info.PSID0);
 			sn_info.PSID0++;
 		}
-		printf("\n");
 		printf("Status: \t\t\t\t%s\n", status[(sn_info.PSID_UID_valid_flags) & 0x3]);
 		printf("Read Mask Enable: \t\t\t0x%0x\n", (sn_info.PSID_UID_valid_flags >> 2) & 0x1);
 		printf("Read Mask Request Enable: \t\t0x%0x\n", (sn_info.PSID_UID_valid_flags >> 3) & 0x1);
