@@ -2242,8 +2242,8 @@ static int fw_redundant(int argc, char **argv)
 
 	argconfig_parse(argc, argv, CMD_DESC_FW_REDUNDANT, opts, &cfg, sizeof(cfg));
 
-	if (!switchtec_is_gen5(cfg.dev)) {
-		fprintf(stderr, "Setting the redundant flag is only supported on Gen5 switches\n");
+	if (!switchtec_is_gen5(cfg.dev) && !switchtec_is_gen6(cfg.dev)) {
+		fprintf(stderr, "Setting the redundant flag is only supported on Gen5/6 switches\n");
 		return 1;
 	}
 	if (!cfg.bl2 && !cfg.key && !cfg.firmware && !cfg.config && !cfg.riotcore) {
@@ -2252,6 +2252,10 @@ static int fw_redundant(int argc, char **argv)
 	}
 	if (cfg.redundant > 1) {
 		fprintf(stderr, "Set redundant flag to either set - 1 or unset - 0\n");
+		return 1;
+	}
+	if (switchtec_is_gen6(cfg.dev) && cfg.riotcore) {
+		fprintf(stderr, "Setting riotcore partition is not supported on Gen6 switches\n");
 		return 1;
 	}
 

@@ -306,7 +306,10 @@ static int set_redundant(struct switchtec_dev *dev, int type, int set)
 
 	cmd.subcmd = MRPC_FWDNLD_SET_RDNDNT;
 	cmd.redundant_val = set;
-	cmd.part_type = type;
+	if (switchtec_is_gen6(dev) && type != 1)
+		cmd.part_type = type - 1;
+	else
+		cmd.part_type = type;
 
 	printf("%s redundant flag \t(%s)\n", set ? "Checking" : "Un-checking", 
 	       part_types[type-1]);
@@ -1443,12 +1446,12 @@ struct switchtec_flash_info_gen6 {
 	uint8_t running_cfg_flag;
 	uint8_t running_img_flag;
 	uint8_t running_key_flag;
-	uint8_t rsvd2[3];
+	uint8_t rsvd2[4];
 	uint8_t key_redundant_flag;
 	uint8_t bl2_redundant_flag;
 	uint8_t cfg_redundant_flag;
 	uint8_t img_redundant_flag;
-	uint8_t rsvd3[3];
+	uint8_t rsvd3[2];
 	uint32_t rsvd4[9];
 	struct switchtec_flash_part_info_gen4 map0, map1, keyman0, keyman1, bl20, 
 						bl21, cfg0, cfg1, img0, img1, 
@@ -1629,27 +1632,35 @@ static int switchtec_fw_part_info_gen6(struct switchtec_dev *dev,
 		part_info = &all->map1;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_KEY0:
+		inf->redundant = all->key_redundant_flag;
 		part_info = &all->keyman0;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_KEY1:
+		inf->redundant = all->key_redundant_flag;
 		part_info = &all->keyman1;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_BL20:
+		inf->redundant = all->bl2_redundant_flag;
 		part_info = &all->bl20;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_BL21:
+		inf->redundant = all->bl2_redundant_flag;
 		part_info = &all->bl21;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_IMG0:
+		inf->redundant = all->img_redundant_flag;
 		part_info = &all->img0;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_IMG1:
+		inf->redundant = all->img_redundant_flag;
 		part_info = &all->img1;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_CFG0:
+		inf->redundant = all->cfg_redundant_flag;
 		part_info = &all->cfg0;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_CFG1:
+		inf->redundant = all->cfg_redundant_flag;
 		part_info = &all->cfg1;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_NVLOG:
