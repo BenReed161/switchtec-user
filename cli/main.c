@@ -1856,6 +1856,8 @@ enum switchtec_fw_type check_and_print_fw_image(int img_fd,
 		fprintf(stderr, "%s: Invalid image file format\n",
 			img_filename);
 		return ret;
+	} else if (ret > 0) {
+		return SWITCHTEC_FW_TYPE_BL2;
 	}
 
 	printf("File:           %s\n", get_basename(img_filename));

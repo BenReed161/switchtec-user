@@ -1059,6 +1059,8 @@ int switchtec_fw_file_info(int fd, struct switchtec_fw_image_info *info)
 		return switchtec_fw_file_info_gen3(fd, info);
 	} else if (!strncmp(magic, "MSCC", sizeof(magic))) {
 		return switchtec_fw_file_info_gen45(fd, info);
+	} else if (!strncmp(magic, "DCBI", sizeof(magic))) {
+		return 1;	
 	} else {
 		errno = ENOEXEC;
 		return -1;
