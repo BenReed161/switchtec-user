@@ -2276,7 +2276,7 @@ static int fw_redundant(int argc, char **argv)
 	return ret;
 }
 
-#define CMD_DESC_FW_READ "read a firmware image from flash"
+#define CMD_DESC_FW_READ "read a firmware image from flash, default(no args) reads main firmware image"
 
 static int fw_read(int argc, char **argv)
 {
@@ -2308,8 +2308,6 @@ static int fw_read(int argc, char **argv)
 		 "assume yes when prompted"},
 		{"inactive", 'i', "", CFG_NONE, &cfg.inactive, no_argument,
 		 "read the inactive partition"},
-		{"data", 'd', "", CFG_NONE, &cfg.data, no_argument,
-		 "read the data/config partiton instead of the main firmware"},
 		{"config", 'c', "", CFG_NONE, &cfg.data, no_argument,
 		 "read the data/config partiton instead of the main firmware"},
 		{"bl2", 'b', "", CFG_NONE, &cfg.bl2, no_argument,
