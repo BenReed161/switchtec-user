@@ -306,7 +306,10 @@ static int set_redundant(struct switchtec_dev *dev, int type, int set)
 
 	cmd.subcmd = MRPC_FWDNLD_SET_RDNDNT;
 	cmd.redundant_val = set;
-	cmd.part_type = type;
+	if (switchtec_is_gen6(dev) && type != 1)
+		cmd.part_type = type - 1;
+	else
+		cmd.part_type = type;
 
 	printf("%s redundant flag \t(%s)\n", set ? "Checking" : "Un-checking", 
 	       part_types[type-1]);
@@ -456,6 +459,7 @@ int switchtec_fw_toggle_active_partition(struct switchtec_dev *dev,
 {
 	uint32_t cmd_id;
 	size_t cmd_size;
+	int ret;
 	struct {
 		uint8_t subcmd;
 		uint8_t toggle_fw;
@@ -463,26 +467,40 @@ int switchtec_fw_toggle_active_partition(struct switchtec_dev *dev,
 		uint8_t toggle_bl2;
 		uint8_t toggle_key;
 		uint8_t toggle_riotcore;
+		uint16_t reserved;
 	} cmd;
 
 	if (switchtec_boot_phase(dev) == SWITCHTEC_BOOT_PHASE_BL2) {
+		cmd_size = sizeof(cmd);
 		cmd_id = get_fw_tx_id(dev);
 		cmd.subcmd = MRPC_FW_TX_TOGGLE;
-	} else {
-		cmd_id = MRPC_FWDNLD;
-		cmd.subcmd = MRPC_FWDNLD_TOGGLE;
+		cmd.toggle_bl2 = !!toggle_bl2;
+		ret = switchtec_cmd(dev, cmd_id, &cmd, cmd_size, NULL, 0);
+		if (ret)
+			return ret;
+		cmd.toggle_bl2 = 0;
+		cmd.toggle_fw = !!toggle_fw;
+		ret = switchtec_cmd(dev, cmd_id, &cmd, cmd_size, NULL, 0);
+		if (ret)
+			return ret;
+		cmd.toggle_fw = 0;
+		cmd.toggle_cfg = !!toggle_cfg;
+		ret = switchtec_cmd(dev, cmd_id, &cmd, cmd_size, NULL, 0);
+		if (ret)
+			return ret;
+		
+		return 0;
 	}
-
+	
+	cmd_id = MRPC_FWDNLD;
+	cmd.subcmd = MRPC_FWDNLD_TOGGLE;
 	cmd.toggle_bl2 = !!toggle_bl2;
 	cmd.toggle_key = !!toggle_key;
 	cmd.toggle_fw = !!toggle_fw;
 	cmd.toggle_cfg = !!toggle_cfg;
-	if (switchtec_is_gen5(dev)) {
+	if (switchtec_is_gen5(dev))
 		cmd.toggle_riotcore = !!toggle_riotcore;
-		cmd_size = sizeof(cmd);
-	} else {
-		cmd_size = sizeof(cmd) - 1;
-	}
+	cmd_size = sizeof(cmd);
 
 	return switchtec_cmd(dev, cmd_id, &cmd, cmd_size,
 			     NULL, 0);
@@ -1056,6 +1074,8 @@ int switchtec_fw_file_info(int fd, struct switchtec_fw_image_info *info)
 		return switchtec_fw_file_info_gen3(fd, info);
 	} else if (!strncmp(magic, "MSCC", sizeof(magic))) {
 		return switchtec_fw_file_info_gen45(fd, info);
+	} else if (!strncmp(magic, "DCBI", sizeof(magic))) {
+		return 1;	
 	} else {
 		errno = ENOEXEC;
 		return -1;
@@ -1443,12 +1463,12 @@ struct switchtec_flash_info_gen6 {
 	uint8_t running_cfg_flag;
 	uint8_t running_img_flag;
 	uint8_t running_key_flag;
-	uint8_t rsvd2[3];
+	uint8_t rsvd2[4];
 	uint8_t key_redundant_flag;
 	uint8_t bl2_redundant_flag;
 	uint8_t cfg_redundant_flag;
 	uint8_t img_redundant_flag;
-	uint8_t rsvd3[3];
+	uint8_t rsvd3[2];
 	uint32_t rsvd4[9];
 	struct switchtec_flash_part_info_gen4 map0, map1, keyman0, keyman1, bl20, 
 						bl21, cfg0, cfg1, img0, img1, 
@@ -1629,27 +1649,35 @@ static int switchtec_fw_part_info_gen6(struct switchtec_dev *dev,
 		part_info = &all->map1;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_KEY0:
+		inf->redundant = all->key_redundant_flag;
 		part_info = &all->keyman0;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_KEY1:
+		inf->redundant = all->key_redundant_flag;
 		part_info = &all->keyman1;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_BL20:
+		inf->redundant = all->bl2_redundant_flag;
 		part_info = &all->bl20;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_BL21:
+		inf->redundant = all->bl2_redundant_flag;
 		part_info = &all->bl21;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_IMG0:
+		inf->redundant = all->img_redundant_flag;
 		part_info = &all->img0;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_IMG1:
+		inf->redundant = all->img_redundant_flag;
 		part_info = &all->img1;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_CFG0:
+		inf->redundant = all->cfg_redundant_flag;
 		part_info = &all->cfg0;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_CFG1:
+		inf->redundant = all->cfg_redundant_flag;
 		part_info = &all->cfg1;
 		break;
 	case SWITCHTEC_FW_PART_ID_G6_NVLOG:

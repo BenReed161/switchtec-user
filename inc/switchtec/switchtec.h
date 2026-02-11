@@ -932,42 +932,42 @@ static inline const char *switchtec_ltssm_str_gen5(int ltssm, int show_minor)
 static inline const char *switchtec_ltssm_str_gen6(int ltssm_major)
 {
 	switch(ltssm_major) {
-	case 0x00: return "DETECT_QUIET";
-	case 0x01: return "DETECT_ACTIVE";
-	case 0x02: return "POLL_ACTIVE";
-	case 0x03: return "POLL_COMPLIANCE";
-	case 0x04: return "POLL_CONFIG";
-	case 0x05: return "PRE_DETECT_QUIET";
-	case 0x06: return "DETECT_WAIT";
-	case 0x07: return "CFG_LINKWD_START";
-	case 0x08: return "CFG_LINKWD_ACEPT";
-	case 0x09: return "CFG_LANENUM_WAI";
-	case 0x0A: return "CFG_LANENUM_ACEPT";
-	case 0x0B: return "CFG_COMPLETE";
-	case 0x0C: return "CFG_IDLE";
-	case 0x0D: return "RCVRY_LOCK";
-	case 0x0E: return "RCVRY_SPEED";
-	case 0x0F: return "RCVRY_RCVRCFG";
-	case 0x10: return "RCVRY_IDLE";
-	case 0x11: return "L0";
-	case 0x12: return "L0S";
-	case 0x13: return "L123_SEND_EIDLE";
-	case 0x14: return "L1_IDLE";
-	case 0x15: return "L2_IDLE";
-	case 0x16: return "L2_WAKE";
-	case 0x17: return "DISABLED_ENTRY";
-	case 0x18: return "DISABLED_IDLE";
-	case 0x19: return "DISABLED";
-	case 0x1A: return "LPBK_ENTRY";
-	case 0x1B: return "LPBK_ACTIVE";
-	case 0x1C: return "LPBK_EXIT";
-	case 0x1D: return "LPBK_EXIT_TIMEOUT";
-	case 0x1E: return "HOT_RESET_ENTRY";
-	case 0x1F: return "HOT_RESET";
-	case 0x20: return "RCVRY_EQ0";
-	case 0x21: return "RCVRY_EQ1";
-	case 0x22: return "RCVRY_EQ2";
-	case 0x23: return "RCVRY_EQ3";
+	case 0x00: return "Detect (QUIET)";
+	case 0x01: return "Detect (ACTIVE)";
+	case 0x02: return "Polling (ACTIVE)";
+	case 0x03: return "Polling (COMPLIANCE)";
+	case 0x04: return "Polling (CONFIG)";
+	case 0x05: return "Detect (PRE_DETECT_QUIET)";
+	case 0x06: return "Detect (DETECT_WAIT)";
+	case 0x07: return "Configuration (LINKWD_START)";
+	case 0x08: return "Configuration (LINKWD_ACCEPT)";
+	case 0x09: return "Configuration (LANENUM_WAIT)";
+	case 0x0A: return "Configuration (LANENUM_ACCEPT)";
+	case 0x0B: return "Configuration (COMPLETE)";
+	case 0x0C: return "Configuration (IDLE)";
+	case 0x0D: return "Recovery (LOCK)";
+	case 0x0E: return "Recovery (SPEED)";
+	case 0x0F: return "Recovery (RCVRCFG)";
+	case 0x10: return "Recovery (IDLE)";
+	case 0x11: return "L0 (ACTIVE)";
+	case 0x12: return "L0s (IDLE)";
+	case 0x13: return "L1/L2/L3 (SEND_EIDLE)";
+	case 0x14: return "L1 (IDLE)";
+	case 0x15: return "L2 (IDLE)";
+	case 0x16: return "L2 (WAKE)";
+	case 0x17: return "Disabled (ENTRY)";
+	case 0x18: return "Disabled (IDLE)";
+	case 0x19: return "Disabled";
+	case 0x1A: return "Loopback (ENTRY)";
+	case 0x1B: return "Loopback (ACTIVE)";
+	case 0x1C: return "Loopback (EXIT)";
+	case 0x1D: return "Loopback (EXIT_TIMEOUT)";
+	case 0x1E: return "Hot Reset (ENTRY)";
+	case 0x1F: return "Hot Reset";
+	case 0x20: return "Recovery (EQ0)";
+	case 0x21: return "Recovery (EQ1)";
+	case 0x22: return "Recovery (EQ2)";
+	case 0x23: return "Recovery (EQ3)";
 	default:   return "UNKNOWN";
 	}
 }
@@ -1519,6 +1519,25 @@ enum switchtec_diag_eye_data_mode {
 	SWITCHTEC_DIAG_EYE_RATIO,
 };
 
+enum switchtec_diag_eye_data_mode_gen6 {
+	SWITCHTEC_DIAG_EYE_ADC,
+	SWITCHTEC_DIAG_EYE_FFE,
+	SWITCHTEC_DIAG_EYE_DFE,
+};
+
+enum switchtec_diag_eye_mode_gen6 {
+	SWITCHTEC_DIAG_EYE_FULL,
+	SWITCHTEC_DIAG_EYE_INTERLEAVE,
+	SWITCHTEC_DIAG_EYE_SAR,
+};
+
+enum switchtec_diag_eye_h_step {
+	SWITCHTEC_DIAG_EYE_ULTRA_FINE = 1,
+	SWITCHTEC_DIAG_EYE_FINE = 2,
+	SWITCHTEC_DIAG_EYE_MEDIUM = 3,
+	SWITCHTEC_DIAG_EYE_COARSE = 4,
+};
+
 struct switchtec_gen5_diag_eye_status_in {
 	uint8_t sub_cmd;
 	uint8_t resvd1[3];
@@ -1574,6 +1593,18 @@ enum switchtec_diag_pattern_gen5 {
 	SWITCHTEC_DIAG_GEN_5_PATTERN_PRBS_DISABLED,
 };
 
+enum switchtec_diag_pattern_gen6 {
+	SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_7,
+	SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_9,
+	SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_11,
+	SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_13,
+	SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_15,
+	SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_23,
+	SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_31,
+	SWITCHTEC_DIAG_GEN_6_PATTERN_PCIE_52_UI_JIT = 0x19,
+	SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_DISABLED = 0x1A,
+};
+
 enum switchtec_diag_pattern_link_rate {
 	SWITCHTEC_DIAG_PAT_LINK_DISABLED = 0,
 	SWITCHTEC_DIAG_PAT_LINK_GEN1 = 1,
@@ -1581,6 +1612,7 @@ enum switchtec_diag_pattern_link_rate {
 	SWITCHTEC_DIAG_PAT_LINK_GEN3 = 3,
 	SWITCHTEC_DIAG_PAT_LINK_GEN4 = 4,
 	SWITCHTEC_DIAG_PAT_LINK_GEN5 = 5,
+	SWITCHTEC_DIAG_PAT_LINK_GEN6 = 6,
 };
 
 enum switchtec_diag_ltssm_speed {
@@ -1632,7 +1664,9 @@ int switchtec_diag_eye_read(struct switchtec_dev *dev, int lane_id, int bin,
 		            int* num_phases, double* ber_data);
 int switchtec_diag_eye_start(struct switchtec_dev *dev, int lane_mask[4],
 			     struct range *x_range, struct range *y_range,
-			     int step_interval, int capture_depth);
+			     int step_interval, int capture_depth, int sar_sel,
+			     int intleav_sel, int hstep, int data_mode, 
+			     int eye_mode, uint64_t refclk, int vstep);
 int switchtec_diag_eye_fetch(struct switchtec_dev *dev, double *pixels,
 			     size_t pixel_cnt, int *lane_id);
 int switchtec_diag_eye_cancel(struct switchtec_dev *dev);

@@ -81,6 +81,11 @@ static const struct argconfig_choice port_eq_prev_speeds[] = {
 	.choices=port_eq_prev_speeds					\
 }
 
+#define OSA_STACK_ID_OPTION {						\
+	"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 		\
+	required_argument,"ID of the stack (0-5), 7 for mangement stack (Gen5). ID of the stack (0-9) (Gen6)", \
+}
+
 static int get_port(struct switchtec_dev *dev, int port_id,
 		    struct switchtec_status *port)
 {
@@ -215,6 +220,33 @@ static int ltssm_log(int argc, char **argv) {
 
 	return ret;
 }
+
+static const struct argconfig_choice data_mode_choices[] = {
+	{"ADC", SWITCHTEC_DIAG_EYE_ADC,
+	 "ADC data mode"},
+	{"FFE", SWITCHTEC_DIAG_EYE_FFE,
+	 "FFE eye data mode"},
+	{"DFE", SWITCHTEC_DIAG_EYE_DFE,
+	 "enumated DFE data eye data mode"},
+	{}
+};
+
+static const struct argconfig_choice eye_modes_gen6[] = {
+	{"FULL", SWITCHTEC_DIAG_EYE_FULL,
+	 "the full eye diagram"},
+	{"INTERLEAVE", SWITCHTEC_DIAG_EYE_INTERLEAVE,
+	 "interleaver eye diagram"},
+	{"SAR", SWITCHTEC_DIAG_EYE_SAR,
+	 "interleaver eye diagram"},
+	{}
+};
+
+static const struct argconfig_choice hstep_choices[] = {
+	{"ultra-fine", SWITCHTEC_DIAG_EYE_ULTRA_FINE, "ultra-fine"},
+	{"fine", SWITCHTEC_DIAG_EYE_FINE, "fine"},
+	{"medium", SWITCHTEC_DIAG_EYE_MEDIUM, "medium"},
+	{"coarse", SWITCHTEC_DIAG_EYE_COARSE, "coarse"},
+};
 
 static const struct argconfig_choice eye_modes[] = {
 	{"RAW", SWITCHTEC_DIAG_EYE_RAW,
@@ -1243,7 +1275,8 @@ static double *eye_observe_dev(struct switchtec_dev *dev, int port_id,
 		goto out_err;
 	}
 
-	ret = switchtec_diag_eye_start(dev, lane_mask, X, Y, interval, 0);
+	ret = switchtec_diag_eye_start(dev, lane_mask, X, Y, interval, 
+				       0, 0, 0, 0, 0, 0, 0, 0);
 	if (ret) {
 		switchtec_perror("eye_start");
 		goto out_err;
@@ -1350,7 +1383,10 @@ static int eye_graph(enum output_format fmt, struct range *X, struct range *Y,
 
 static double *eye_capture_dev_gen5(struct switchtec_dev *dev,
 				    int port_id, int lane_id, int num_lanes,
-				    int capture_depth, int* num_phases, int* gen)
+				    int capture_depth, int* num_phases, int* gen, 
+				    int sar_sel, int intleav_sel, int hstep, 
+				    int data_mode, int eye_mode, uint64_t refclk,
+				    int vstep)
 {
 	int bin, j, ret, first_lane, num_phases_l, stride;
 	int lane_mask[4] = {};
@@ -1366,7 +1402,8 @@ static double *eye_capture_dev_gen5(struct switchtec_dev *dev,
 	}
 
 	ret = switchtec_diag_eye_start(dev, lane_mask, NULL, NULL, 0, 
-				       capture_depth);
+				       capture_depth, sar_sel, intleav_sel, hstep,
+				       data_mode, eye_mode, refclk, vstep);
 	if (ret) {
 		switchtec_perror("eye_run");
 		return NULL;
@@ -1427,6 +1464,12 @@ static int eye(int argc, char **argv)
 		const char *plot_filename;
 		FILE *crosshair_file;
 		const char *crosshair_filename;
+		int eye_modes_gen6;
+		int hstep;
+		int sar_sel;
+		int intleav_sel;
+		uint64_t refclk;
+		int data_mode;
 	} cfg = {
 		.fmt = FMT_DEFAULT,
 		.port_id = -1,
@@ -1441,6 +1484,12 @@ static int eye(int argc, char **argv)
 		.y_range.end = 255,
 		.y_range.step = 5,
 		.step_interval = 1,
+		.hstep = 1,
+		.sar_sel = 10,
+		.intleav_sel = 0,
+		.refclk = 0,
+		.data_mode = SWITCHTEC_DIAG_EYE_ADC,
+		.eye_modes_gen6 = SWITCHTEC_DIAG_EYE_FULL,
 	};
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION_OPTIONAL,
@@ -1455,6 +1504,12 @@ static int eye(int argc, char **argv)
 		{"mode", 'm', "MODE", CFG_CHOICES, &cfg.mode,
 		 required_argument, "data mode for the capture",
 		 .choices=eye_modes},
+		{"mode-gen6", 'M', "MODE", CFG_CHOICES, &cfg.mode,
+		 required_argument, "eye mode for the capture for gen6",
+		 .choices=eye_modes_gen6},
+		{"data-mode", 'd', "MODE", CFG_CHOICES, &cfg.data_mode,
+		 required_argument, "data mode for the eye capture gen6",
+		 .choices=data_mode_choices},
 		{"num-lanes", 'n', "NUM", CFG_POSITIVE, &cfg.num_lanes,
 		 required_argument,
 		 "number of lanes to capture, if greater than one, format must be csv (default: 1)"},
@@ -1478,6 +1533,15 @@ static int eye(int argc, char **argv)
 		 required_argument, "step interval in ms (default: 1ms)"},
 		{"capture-depth", 'd', "NUM", CFG_POSITIVE, &cfg.capture_depth,
 		 required_argument, "capture depth (6 to 40; default: 24)"},
+		{"h-step", 'H', "NUM", CFG_CHOICES, &cfg.hstep,
+		 required_argument, "Granularity of the X-axis Gen 6 only", 
+		 .choices=hstep_choices},
+		{"sar-sel", 'e', "NUM", CFG_NONNEGATIVE, &cfg.sar_sel,
+		 required_argument, "Eye scan for a particular slice (10 to 15) Gen 6 only"},
+		{"intleav-sel", 'I', "NUM", CFG_NONNEGATIVE, &cfg.intleav_sel,
+		 required_argument, "Eye scan for a particular interleave (0 to 3) Gen6 only"},
+		{"refclk", 'r', "NUM", CFG_NONNEGATIVE, &cfg.refclk, required_argument,
+		 "Configures the number of ref clk cycles used to sample the data (0 to 48 bit num max) Gen 6 only"},
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_DESC_EYE, opts, &cfg,
@@ -1564,11 +1628,14 @@ static int eye(int argc, char **argv)
 	}
 
 	if (!pixels) {
-		if (switchtec_is_gen5(cfg.dev)) {
+		if (switchtec_is_gen5(cfg.dev) || switchtec_is_gen6(cfg.dev)) {
 			pixels = eye_capture_dev_gen5(cfg.dev, cfg.port_id, 
 						      cfg.lane_id, cfg.num_lanes, 
 						      cfg.capture_depth, 
-						      &num_phases, &gen);
+						      &num_phases, &gen, cfg.sar_sel,
+						      cfg.intleav_sel, cfg.hstep,
+						      cfg.data_mode, cfg.eye_modes_gen6,
+						      cfg.refclk, cfg.y_range.step);
 			if (!pixels)
 				return -1;
 
@@ -1762,6 +1829,20 @@ static int loopback(int argc, char **argv)
 	return print_loopback_mode(cfg.dev, cfg.port_id);
 }
 
+static const struct argconfig_choice all_pattern_types[] = {
+	{"PRBS7",   SWITCHTEC_DIAG_PATTERN_PRBS_7,  "PRBS 7"},
+	{"PRBS11",  SWITCHTEC_DIAG_PATTERN_PRBS_11, "PRBS 11"},
+	{"PRBS23",  SWITCHTEC_DIAG_PATTERN_PRBS_23, "PRBS 23"},
+	{"PRBS31",  SWITCHTEC_DIAG_PATTERN_PRBS_31, "PRBS 31"},
+	{"PRBS9",   SWITCHTEC_DIAG_PATTERN_PRBS_9,  "PRBS 9"},
+	{"PRBS15",  SWITCHTEC_DIAG_PATTERN_PRBS_15, "PRBS 15"},
+	{"PRBS5",   SWITCHTEC_DIAG_GEN_5_PATTERN_PRBS_5,  "PRBS 5 (Gen 5)"},
+	{"PRBS20",  SWITCHTEC_DIAG_GEN_5_PATTERN_PRBS_20, "PRBS 20 (Gen 5)"},
+	{"PRBS13",  SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_13, "PRBS 13 (Gen 6)"},
+	{"52UI",    SWITCHTEC_DIAG_GEN_6_PATTERN_PCIE_52_UI_JIT, "PCIe 52UI Jitter (Gen 6)"},
+	{}
+};
+
 static const struct argconfig_choice pattern_types[] = {
 	{"PRBS7",   SWITCHTEC_DIAG_PATTERN_PRBS_7,  "PRBS 7"},
 	{"PRBS11",  SWITCHTEC_DIAG_PATTERN_PRBS_11, "PRBS 11"},
@@ -1774,12 +1855,25 @@ static const struct argconfig_choice pattern_types[] = {
 	{}
 };
 
+static const struct argconfig_choice pattern_types_gen6[] = {
+	{"PRBS7",   SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_7,  "PRBS 7"},
+	{"PRBS11",  SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_9, "PRBS 9"},
+	{"PRBS23",  SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_11, "PRBS 11"},
+	{"PRBS31",  SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_13, "PRBS 13"},
+	{"PRBS9",   SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_15,  "PRBS 15"},
+	{"PRBS15",  SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_23, "PRBS 23"},
+	{"PRBS5",   SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_31,  "PRBS 31"},
+	{"PRBS20",  SWITCHTEC_DIAG_GEN_6_PATTERN_PCIE_52_UI_JIT, "PCIe 52UI Jitter"},
+	{}
+};
+
 static const struct argconfig_choice pat_gen_link_speeds[] = {
 	{"GEN1", SWITCHTEC_DIAG_PAT_LINK_GEN1, "GEN1 Pattern Generator Speed"},
 	{"GEN2", SWITCHTEC_DIAG_PAT_LINK_GEN2, "GEN2 Pattern Generator Speed"},
 	{"GEN3", SWITCHTEC_DIAG_PAT_LINK_GEN3, "GEN3 Pattern Generator Speed"},
 	{"GEN4", SWITCHTEC_DIAG_PAT_LINK_GEN4, "GEN4 Pattern Generator Speed"},
 	{"GEN5", SWITCHTEC_DIAG_PAT_LINK_GEN5, "GEN5 Pattern Generator Speed"},
+	{"GEN6", SWITCHTEC_DIAG_PAT_LINK_GEN6, "GEN6 Pattern Generator Speed"},
 };
 
 static const char *pattern_to_str(enum switchtec_diag_pattern type)
@@ -1787,6 +1881,18 @@ static const char *pattern_to_str(enum switchtec_diag_pattern type)
 	const struct argconfig_choice *s;
 
 	for (s = pattern_types; s->name; s++) {
+		if (s->value == type)
+			return s->name;
+	}
+
+	return "UNKNOWN";
+}
+
+static const char *pattern_to_str_gen6(enum switchtec_diag_pattern_gen6 type)
+{
+	const struct argconfig_choice *s;
+
+	for (s = pattern_types_gen6; s->name; s++) {
 		if (s->value == type)
 			return s->name;
 	}
@@ -1811,6 +1917,7 @@ static int print_pattern_mode(struct switchtec_dev *dev,
 {
 	enum switchtec_diag_pattern gen_pat, mon_pat;
 	int gen_pat_gen5, mon_pat_gen5;
+	enum switchtec_diag_pattern_gen6 mon_pat_gen6, gen_pat_gen6;
 	unsigned long long err_cnt;
 	int ret, lane_id;
 	int err = 0;
@@ -1821,6 +1928,7 @@ static int print_pattern_mode(struct switchtec_dev *dev,
 		return -1;
 	}
 	gen_pat_gen5 = gen_pat;
+	gen_pat_gen6 = gen_pat;
 	if (gen_pat_gen5 == SWITCHTEC_DIAG_GEN_5_PATTERN_PRBS_DISABLED) {
 		fprintf(stderr, "!! The pattern generator is disabled on either the TX or RX port\n");
 		err = 1;
@@ -1829,6 +1937,7 @@ static int print_pattern_mode(struct switchtec_dev *dev,
 	ret = switchtec_diag_pattern_mon_get(dev, port_id, 0, &mon_pat, 
 					     &err_cnt);
 	mon_pat_gen5 = mon_pat;
+	mon_pat_gen6 = mon_pat;
 	if (ret == ERR_PAT_MON_IS_DISABLED || mon_pat_gen5 == SWITCHTEC_DIAG_GEN_5_PATTERN_PRBS_DISABLED) {
 		fprintf(stderr, "!! The pattern monitor is disabled on either the TX or RX port\n");
 		err = 1;
@@ -1844,15 +1953,22 @@ static int print_pattern_mode(struct switchtec_dev *dev,
 	}
 
 	printf("Port: %d\n", port_id);
-	if (gen_pat == SWITCHTEC_DIAG_PATTERN_PRBS_DISABLED && switchtec_is_gen4(dev))
+	if (gen_pat == SWITCHTEC_DIAG_PATTERN_PRBS_DISABLED && switchtec_is_gen4(dev)) {
 		printf("  Generator: Disabled\n");
-	else
-		printf("  Generator: %s\n", pattern_to_str(gen_pat));
+	} else {
+		if (switchtec_is_gen6(dev))
+			printf("  Generator: %s\n", pattern_to_str_gen6(gen_pat_gen6));
+		else
+			printf("  Generator: %s\n", pattern_to_str(gen_pat));
+	}
 
 	if (mon_pat == SWITCHTEC_DIAG_PATTERN_PRBS_DISABLED && switchtec_is_gen4(dev)) {
 		printf("  Monitor: Disabled\n");
 	} else {
-		printf("  Monitor: %-20s\n", pattern_to_str(mon_pat));
+		if (switchtec_is_gen6(dev))
+			printf("  Monitor: %-20s\n", pattern_to_str_gen6(mon_pat_gen6));
+		else
+			printf("  Monitor: %-20s\n", pattern_to_str(mon_pat));
 		printf("    Lane %-2d    Errors: 0x%llx\n", 0, err_cnt);
 		for (lane_id = 1; lane_id < port->cfg_lnk_width; lane_id++) {
 			ret = switchtec_diag_pattern_mon_get(dev, port_id,
@@ -1891,7 +2007,7 @@ static int pattern(int argc, char **argv)
 		int link_speed;
 	} cfg = {
 		.port_id = -1,
-		.pattern = SWITCHTEC_DIAG_PATTERN_PRBS_31,
+		.pattern = SWITCHTEC_DIAG_PATTERN_PRBS_7,
 	};
 
 	const struct argconfig_options opts[] = {
@@ -1910,8 +2026,8 @@ static int pattern(int argc, char **argv)
 		 "Enable Pattern Monitor on specified port"},
 		{"pattern", 't', "PATTERN", CFG_CHOICES, &cfg.pattern,
 		 required_argument,
-		 "pattern to generate or monitor for (default: PRBS31)",
-		 .choices = pattern_types},
+		 "pattern to generate or monitor for (default: PRBS7)",
+		 .choices = all_pattern_types},
 		{"speed", 's', "SPEED", CFG_CHOICES, &cfg.link_speed,
 		 required_argument, 
 		 "link speed that applies to the pattern generator (default: GEN1)",
@@ -1923,6 +2039,26 @@ static int pattern(int argc, char **argv)
 	if (cfg.link_speed && cfg.monitor) {
 		fprintf(stderr,
 			"Cannot enable link speed -s / --speed on pattern monitor\n");
+		return -1;
+	}
+
+	if (cfg.pattern == SWITCHTEC_DIAG_GEN_6_PATTERN_PRBS_13 && !switchtec_is_gen6(cfg.dev)) {
+		fprintf(stderr, "Cannot set PRBS 13 pattern for non Gen6 Switchtec device.\n");
+		return -1;
+	}
+
+	if (cfg.pattern == SWITCHTEC_DIAG_GEN_6_PATTERN_PCIE_52_UI_JIT && !switchtec_is_gen6(cfg.dev)) {
+		fprintf(stderr, "Cannot set PCIe 52 UI Jitter pattern for non Gen6 Switchtec device.\n");
+		return -1;
+	}
+
+	if (cfg.pattern == SWITCHTEC_DIAG_GEN_5_PATTERN_PRBS_5 && !switchtec_is_gen5(cfg.dev)) {
+		fprintf(stderr, "Cannot set PRBS 5 pattern for non Gen6 Switchtec device.\n");
+		return -1;
+	}
+
+	if (cfg.pattern == SWITCHTEC_DIAG_GEN_5_PATTERN_PRBS_20 && !switchtec_is_gen5(cfg.dev)) {
+		fprintf(stderr, "Cannot set PRBS 20 pattern for non Gen6 Switchtec device.\n");
 		return -1;
 	}
 	
@@ -1960,12 +2096,17 @@ static int pattern(int argc, char **argv)
 			switchtec_perror("pattern_mon_set");
 			return -1;
 		}
-		if (cfg.disable)
+		if (cfg.disable) {
 			printf("Disabled pattern monitor on port %d\n",
 				cfg.port_id);
-		else
-			printf("Pattern monitor set for port %d with pattern type %s\n", 
-				cfg.port_id, pattern_to_str(cfg.pattern));
+		} else {
+			if (switchtec_is_gen6(cfg.dev))
+				printf("Pattern monitor set for port %d with pattern type %s\n", 
+					cfg.port_id, pattern_to_str_gen6(cfg.pattern));
+			else
+				printf("Pattern monitor set for port %d with pattern type %s\n", 
+					cfg.port_id, pattern_to_str(cfg.pattern));
+		}
 	}
 
 	if (cfg.generate) {
@@ -2653,6 +2794,22 @@ static int linkerr_inject(int argc, char ** argv)
 	return ret;
 }
 
+static int stack_id_check(struct switchtec_dev *dev, int stack_id)
+{
+	if (switchtec_is_gen6(dev)) {
+		if (stack_id < 0 || stack_id > 9)
+			goto invalid_stack;
+	} else {
+		if (stack_id < 0 || (stack_id > 5 && stack_id != 7))
+			goto invalid_stack;
+	}
+	return 0;
+
+invalid_stack:
+	fprintf(stderr, "Invalid stack ID.\n");
+	return -1;
+}
+
 #define CMD_ORDERED_SET_ANALYZER "Ordered set analyzer"
 
 static int osa(int argc, char **argv)
@@ -2665,8 +2822,7 @@ static int osa(int argc, char **argv)
 	} cfg;
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
-		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
-		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		OSA_STACK_ID_OPTION,
 		{"operation", 'o', "0/1/2/3/4/5", CFG_INT, &cfg.operation, 
 		required_argument,"operations:\n- stop:0\n- start:1\n- trigger:2\n- reset:3\n- release:4\n- status:5"},
 		{NULL}};
@@ -2674,10 +2830,9 @@ static int osa(int argc, char **argv)
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, 
 			sizeof(cfg));
 
-	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
-		fprintf(stderr, "Invalid stack ID.\n");
-		return -1;
-	}
+	ret = stack_id_check(cfg.dev, cfg.stack_id);
+	if (ret)
+		return ret;
 
 	if (cfg.operation > 5 || cfg.operation < 0) {
 		printf("Invalid operation!\n");
@@ -2712,8 +2867,7 @@ static int osa_config_type(int argc, char **argv)
 	} cfg;
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
-		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
-		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		OSA_STACK_ID_OPTION,
 		{"lane_mask", 'm', "LANE_MASK", CFG_STRING, &cfg.lane_mask, 
 		required_argument,
 		"16 bit lane mask, 1 enables the triggering for that specified lane. " \
@@ -2724,23 +2878,22 @@ static int osa_config_type(int argc, char **argv)
 		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x\nBit 0 : tx\nBit 1 : rx"},
 		{"link_rate", 'r', "LINK_RATE", CFG_STRING, &cfg.link_rate, 
 		required_argument,
-		"5 bit mask for link rate, 1 enables the corrisponding link rate. " \
+		"6 bit mask for link rate, 1 enables the corrisponding link rate. " \
 		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with " \
-		"0x\nBit 0 : Gen1\nBit 1 : Gen2\nBit 2 : Gen3\nBit 3 : Gen4\nBit 4 : Gen5"},
+		"0x\nBit 0 : Gen1\nBit 1 : Gen2\nBit 2 : Gen3\nBit 3 : Gen4\nBit 4 : Gen5\nBit 5 : Gen6"},
 		{"os_types", 't', "OS_TYPES", CFG_STRING, &cfg.os_types, 
 		required_argument,
-		"4 bit mask for OS types, 1 enables the corrisponding OS type. "\
-		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with "\
-		"0x\nBit 0 : TS1\nBit 1 : TS2\nBit 2 : FTS\nBit 3 : CTL_SKP"},
+		"4 bit mask for OS types, 5 bit mask Gen6 only. 1 enables the corrisponding OS type. "\
+		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x."\
+		"\n\t\tGen5\tGen6\nBit 0\tTS1\tTS0\nBit 1\tTS2\tTS1\nBit 2\tFTS\tTS2\nBit 3\tCTL_SKP\tFTS\nBit 4\t----\tCTL_SKP"},
 		{NULL}};
 	
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_CONF, opts, &cfg, 
 			sizeof(cfg));
 
-	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
-		fprintf(stderr, "Invalid stack ID.\n");
-		return -1;
-	}
+	ret = stack_id_check(cfg.dev, cfg.stack_id);
+	if (ret)
+		return ret;
 
 	if (cfg.lane_mask) {
 		ret = convert_hex_str(cfg.lane_mask, &lane_mask, &num_dwords, 4);
@@ -2770,8 +2923,14 @@ static int osa_config_type(int argc, char **argv)
 			fprintf(stderr, "Error with link rate mask.\n");
 			return -1;
 		}
-		if (*link_rate_mask > 31) {
-			fprintf(stderr, "Link rate cannot be greater than 0x1F.\n");
+		if ((*link_rate_mask > 31 || (*link_rate_mask | 0x20)) && switchtec_is_gen5(cfg.dev)) {
+			fprintf(stderr, "Cannot enable Gen6 link rate or mask greater than 0x1F (Gen5 Switchtec devices).\n");
+			free(lane_mask);
+			free(direction_mask);
+			free(link_rate_mask);
+			return -1;
+		} else if (*link_rate_mask > 63 && switchtec_is_gen6(cfg.dev)) {
+			fprintf(stderr, "Link rate cannot be greater than 0x3F (Gen6 Switchtec devices).\n");
 			free(lane_mask);
 			free(direction_mask);
 			free(link_rate_mask);
@@ -2842,9 +3001,9 @@ static int osa_config_pat(int argc, char **argv)
 		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x\nBit 0 : tx\nBit 1 : rx"},
 		{"link_rate", 'r', "LINK_RATE", CFG_STRING, &cfg.link_rate, 
 		required_argument,
-		"5 bit mask for link rate, 1 enables the corrisponding link rate. "\
+		"6 bit mask for link rate, 1 enables the corrisponding link rate. "\
 		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value "\
-		"prefixed with 0x\nBit 0 : Gen1\nBit 1 : Gen2\nBit 2 : Gen3\nBit 3 : Gen4\nBit 4 : Gen5"},
+		"prefixed with 0x\nBit 0 : Gen1\nBit 1 : Gen2\nBit 2 : Gen3\nBit 3 : Gen4\nBit 4 : Gen5\nBit 5 : Gen6"},
 		{"dwords_value", 'V', "\"val_dword0 val_dword1 etc.\"", CFG_STRING, 
 		&cfg.value_dwords, required_argument, 
 		"(Maximum 4 DWs) Dwords should be surrounded by quotations, each "\
@@ -2858,10 +3017,9 @@ static int osa_config_pat(int argc, char **argv)
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_CONF, opts, &cfg, 
 			sizeof(cfg));
 	
-	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
-		fprintf(stderr, "Invalid stack ID.\n");
-		return -1;
-	}
+	ret = stack_id_check(cfg.dev, cfg.stack_id);
+	if (ret)
+		return ret;
 
 	if (cfg.lane_mask) {
 		ret = convert_hex_str(cfg.lane_mask, &lane_mask, &num_dwords, 4);
@@ -2891,8 +3049,14 @@ static int osa_config_pat(int argc, char **argv)
 			fprintf(stderr, "Error with link rate mask.\n");
 			return -1;
 		}
-		if (*link_rate_mask > 31) {
-			fprintf(stderr, "Link rate cannot be greater than 0x1F.\n");
+		if ((*link_rate_mask > 31 || (*link_rate_mask | 0x20)) && switchtec_is_gen5(cfg.dev)) {
+			fprintf(stderr, "Cannot enable Gen6 link rate or mask greater than 0x1F (Gen5 Switchtec devices).\n");
+			free(lane_mask);
+			free(direction_mask);
+			free(link_rate_mask);
+			return -1;
+		} else if (*link_rate_mask > 63 && switchtec_is_gen6(cfg.dev)) {
+			fprintf(stderr, "Link rate cannot be greater than 0x3F (Gen6 Switchtec devices).\n");
 			free(lane_mask);
 			free(direction_mask);
 			free(link_rate_mask);
@@ -2961,8 +3125,7 @@ static int osa_config_misc(int argc, char **argv)
 	} cfg;
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
-		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
-		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		OSA_STACK_ID_OPTION,
 		{"trigger_en", 't', "ENABLED", CFG_STRING, &cfg.trigger_en,
 		required_argument,
 		"3 bit mask for trigger enable, 1 enables the correisponding trigger. "\
@@ -2973,10 +3136,9 @@ static int osa_config_misc(int argc, char **argv)
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_MISC_CONF, 
 			opts, &cfg, sizeof(cfg));
 
-	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
-		fprintf(stderr, "Invalid stack ID.\n");
-		return -1;
-	}
+	ret = stack_id_check(cfg.dev, cfg.stack_id);
+	if (ret)
+		return ret;
 
 	if (cfg.trigger_en) {
 		ret = convert_hex_str(cfg.trigger_en, &trigger_mask, 
@@ -3003,7 +3165,7 @@ static int osa_config_misc(int argc, char **argv)
 
 #define CMD_ORDERED_SET_ANALYZER_CAP_CTRL "Ordered set analyzer capture control"
 
-static int osa_capture_contol(int argc, char **argv)
+static int osa_capture_control(int argc, char **argv)
 {
 	int ret = 0;
 	uint32_t * os_type_mask = NULL;
@@ -3029,8 +3191,7 @@ static int osa_capture_contol(int argc, char **argv)
 
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
-		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
-		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		OSA_STACK_ID_OPTION,
 		{"lane_mask", 'm', "LANE_MASK", CFG_STRING, &cfg.lane_mask, 
 		required_argument,
 		"16 bit lane mask, 1 enables the triggering for that specified lane. "\
@@ -3041,7 +3202,7 @@ static int osa_capture_contol(int argc, char **argv)
 		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x\nBit 0 : tx\nBit 1 : rx"},
 		{"drop_single_os", 'o', "", CFG_NONE, &cfg.drop_single_os, 
 		no_argument, 
-		"When set to 1, the single TS1, TS2, FTS, and CTL_SKP OS's are excluded from the capture."},
+		"When set to 1, the single TS0(Gen6), TS1, TS2, FTS, and CTL_SKP OS's are excluded from the capture."},
 		{"stop_mode", 'S', "", CFG_NONE, &cfg.stop_mode, 
 		no_argument, 
 		"Controls when the OSA stops capturing. disabled: any lane has stopped, enabled: all lanes have stopped. (Default: disabled)"},
@@ -3055,17 +3216,17 @@ static int osa_capture_contol(int argc, char **argv)
 		"Max 256 entries.\n(Required if disabling --snapshot_mode -s)"},
 		{"os_types", 't', "OS_TYPES", CFG_STRING, &cfg.os_types, 
 		required_argument,
-		"8 bit mask for OS types, 1 enables the corrisponding OS type. "\
-		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed "\
-		"with 0x\nBit 0 : TS1\nBit 1 : TS2\nBit 2 : FTS\nBit 3 : CTL_SKP\nBit 4 : SKP\nBit 5 : EIEOS\nBit 6 : EIOS\nBit 7 : ERR_OS"},
+		"4 bit mask for OS types, 5 bit mask Gen6 only. 1 enables the corrisponding OS type. "\
+		"(If left blank defaults to all bits set to 0). Input as a hexidecimal value prefixed with 0x."\
+		"\n\t\tGen5\tGen6\nBit 0\tTS1\tTS0\nBit 1\tTS2\tTS1\nBit 2\tFTS\tTS2\nBit 3\tCTL_SKP\tFTS\n" \
+		"Bit 4\tSKP\tCTL_SKP\nBit 5\tEIEOS\tSKP\nBit 6\tEIOS\tEIEOS\nBit 7\tERR_OS\tEIOS\nBit 8\t----\tERR_OS"},
 		{NULL}};
 	
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER_CAP_CTRL, opts, &cfg, sizeof(cfg));
 
-	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
-		fprintf(stderr, "Invalid stack ID.\n");
-		return -1;
-	}
+	ret = stack_id_check(cfg.dev, cfg.stack_id);
+	if (ret)
+		return ret;
 
 	if (cfg.post_trig_entries && cfg.snapshot_mode) {
 		fprintf(stderr, "Cannot enable snapshot mode and set the number of post trigger entries.\n");
@@ -3134,17 +3295,15 @@ static int osa_dump_config(int argc, char **argv)
 	} cfg;
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
-		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
-		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		OSA_STACK_ID_OPTION,
 		{NULL}};
 
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, 
 			sizeof(cfg));
 
-	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
-		fprintf(stderr, "Invalid stack ID.\n");
-		return -1;
-	}
+	ret = stack_id_check(cfg.dev, cfg.stack_id);
+	if (ret)
+		return ret;
 
 	ret = switchtec_osa_dump_conf(cfg.dev, cfg.stack_id);
 	if (ret) {
@@ -3167,8 +3326,7 @@ static int osa_dump_data(int argc, char **argv)
 	} cfg;
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
-		{"stack_id", 's', "STACK_ID", CFG_INT, &cfg.stack_id, 
-		required_argument,"ID of the stack (0-5), 7 for mangement stack"},
+		OSA_STACK_ID_OPTION,
 		{"lane", 'l', "lane", CFG_INT, &cfg.lane, 
 		required_argument,"lane ID"},
 		{"direction", 'd', "0/1", CFG_INT, &cfg.direction, 
@@ -3178,10 +3336,9 @@ static int osa_dump_data(int argc, char **argv)
 	argconfig_parse(argc, argv, CMD_ORDERED_SET_ANALYZER, opts, &cfg, 
 			sizeof(cfg));
 	
-	if (cfg.stack_id < 0 || (cfg.stack_id > 5 && cfg.stack_id != 7)) {
-		fprintf(stderr, "Invalid stack ID.\n");
-		return -1;
-	}
+	ret = stack_id_check(cfg.dev, cfg.stack_id);
+	if (ret)
+		return ret;
 
 	if (cfg.direction > 1) {
 		fprintf(stderr, "Direction must be either 0 or 1\n");
@@ -3217,7 +3374,7 @@ static const struct cmd commands[] = {
 	CMD(osa_config_type, 	CMD_ORDERED_SET_ANALYZER_CONF),
 	CMD(osa_config_pat,	CMD_ORDERED_SET_ANALYZER_PAT_CONF),
 	CMD(osa_config_misc,	CMD_ORDERED_SET_ANALYZER_MISC_CONF),
-	CMD(osa_capture_contol, CMD_ORDERED_SET_ANALYZER_CAP_CTRL),
+	CMD(osa_capture_control, CMD_ORDERED_SET_ANALYZER_CAP_CTRL),
 	CMD(osa_dump_config,	CMD_ORDERED_SET_ANALYZER_DUMP_CONF),
 	CMD(osa_dump_data,	CMD_ORDERED_SET_ANALYZER_DUMP_DATA),
 	{}

@@ -1856,6 +1856,8 @@ enum switchtec_fw_type check_and_print_fw_image(int img_fd,
 		fprintf(stderr, "%s: Invalid image file format\n",
 			img_filename);
 		return ret;
+	} else if (ret > 0) {
+		return SWITCHTEC_FW_TYPE_BL2;
 	}
 
 	printf("File:           %s\n", get_basename(img_filename));
@@ -2242,8 +2244,8 @@ static int fw_redundant(int argc, char **argv)
 
 	argconfig_parse(argc, argv, CMD_DESC_FW_REDUNDANT, opts, &cfg, sizeof(cfg));
 
-	if (!switchtec_is_gen5(cfg.dev)) {
-		fprintf(stderr, "Setting the redundant flag is only supported on Gen5 switches\n");
+	if (!switchtec_is_gen5(cfg.dev) && !switchtec_is_gen6(cfg.dev)) {
+		fprintf(stderr, "Setting the redundant flag is only supported on Gen5/6 switches\n");
 		return 1;
 	}
 	if (!cfg.bl2 && !cfg.key && !cfg.firmware && !cfg.config && !cfg.riotcore) {
@@ -2252,6 +2254,10 @@ static int fw_redundant(int argc, char **argv)
 	}
 	if (cfg.redundant > 1) {
 		fprintf(stderr, "Set redundant flag to either set - 1 or unset - 0\n");
+		return 1;
+	}
+	if (switchtec_is_gen6(cfg.dev) && cfg.riotcore) {
+		fprintf(stderr, "Setting riotcore partition is not supported on Gen6 switches\n");
 		return 1;
 	}
 
@@ -2270,7 +2276,7 @@ static int fw_redundant(int argc, char **argv)
 	return ret;
 }
 
-#define CMD_DESC_FW_READ "read a firmware image from flash"
+#define CMD_DESC_FW_READ "read a firmware image from flash, default(no args) reads main firmware image"
 
 static int fw_read(int argc, char **argv)
 {
@@ -2302,8 +2308,6 @@ static int fw_read(int argc, char **argv)
 		 "assume yes when prompted"},
 		{"inactive", 'i', "", CFG_NONE, &cfg.inactive, no_argument,
 		 "read the inactive partition"},
-		{"data", 'd', "", CFG_NONE, &cfg.data, no_argument,
-		 "read the data/config partiton instead of the main firmware"},
 		{"config", 'c', "", CFG_NONE, &cfg.data, no_argument,
 		 "read the data/config partiton instead of the main firmware"},
 		{"bl2", 'b', "", CFG_NONE, &cfg.bl2, no_argument,
