@@ -1812,6 +1812,47 @@ static int switchtec_fw_part_info(struct switchtec_dev *dev, int nr_info,
 	return nr_info;
 }
 
+void int_to_image_type_gen6(int type, char *buf, size_t size)
+{
+	char *types[10] = {
+		"MAP0","MAP1","KEY0","KEY1","BL20","BL21","CFG0","CFG1","IMG0","IMG1"
+	};
+	snprintf(buf, size, "%s", types[type]);
+	return;
+}
+
+int switchtec_fw_part_info_bl2(struct switchtec_dev *dev)
+{
+	int ret;
+	struct switchtec_fw_metadata_gen6 metadata;
+	struct {
+		uint8_t subcmd;
+		uint8_t part_id;
+	} subcmd = {
+		.subcmd = MRPC_PART_INFO_GET_METADATA_GEN6,
+	};
+
+	printf("Partitions:\n");
+	for (int i = 0; i <= 9; i++)
+	{
+		char buf[32];
+		char img_type_buf[8];
+		subcmd.part_id = i;
+		ret = switchtec_cmd(dev, MRPC_PART_INFO, &subcmd, sizeof(subcmd),
+				&metadata, sizeof(metadata));
+		if (ret)
+			return -1;
+
+		version_to_string(le32toh(metadata.version), buf, sizeof(buf));
+		int_to_image_type_gen6(i, img_type_buf, sizeof(img_type_buf));
+		printf("  %s\t", img_type_buf);
+		printf("Version: %s\t", buf);
+		printf("CRC: 0x%08x\n", le32toh(metadata.image_crc));
+	}
+
+	return 0;
+}
+
 int switchtec_get_device_id_bl2(struct switchtec_dev *dev,
 			        unsigned short *device_id)
 {

@@ -1991,7 +1991,10 @@ static int fw_info(int argc, char **argv)
 		printf("Currently Running:\n");
 		printf("  IMG\tVersion: %s\n", version);
 	}
-	ret = print_fw_part_info(cfg.dev);
+	if (switchtec_boot_phase(cfg.dev) == SWITCHTEC_BOOT_PHASE_BL2)
+		ret = switchtec_fw_part_info_bl2(cfg.dev);
+	else
+		ret = print_fw_part_info(cfg.dev);
 	if (ret) {
 		switchtec_perror("print fw info");
 		return ret;
@@ -2122,7 +2125,10 @@ static int fw_update(int argc, char **argv)
 	progress_finish(cfg.no_progress_bar);
 	printf("\n");
 
-	print_fw_part_info(cfg.dev);
+	if (switchtec_boot_phase(cfg.dev) == SWITCHTEC_BOOT_PHASE_BL2)
+		switchtec_fw_part_info_bl2(cfg.dev);
+	else
+		print_fw_part_info(cfg.dev);
 	printf("\n");
 
 	if (type == SWITCHTEC_FW_TYPE_MAP) {
