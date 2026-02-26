@@ -2914,14 +2914,16 @@ static int evcntr_wait(int argc, char **argv)
 #define CMD_DESC_RTC "read the real-time clock"
 static int rtc(int argc, char **argv)
 {
-	int ret, operation;
+	int ret;
 	uint64_t rtc_counter;
 
 	static struct {
 		struct switchtec_dev *dev;
 		uint64_t rtc_counter;
 		int rtc_reset;
-	} cfg = {};
+	} cfg = {
+		.rtc_counter = 0
+	};
 	const struct argconfig_options opts[] = {
 		DEVICE_OPTION,
 		{"rtc_counter", 'r', "uS", CFG_INT, &cfg.rtc_counter, required_argument,
@@ -2942,36 +2944,29 @@ static int rtc(int argc, char **argv)
 		return 1;
 	}
 
-	if (cfg.rtc_counter) {
-		operation = 1;
-		printf("Setting RTC Counter to %ld microseconds\n", rtc_counter);
-	} else {
-		operation = 2;
+	if (cfg.rtc_counter || cfg.rtc_reset) {
+		if(cfg.rtc_reset)
+			printf("Resetting RTC Counter\n");
+		else
+			printf("Setting RTC Counter to %ld microseconds\n", rtc_counter);
+		ret = switchtec_rtc_counter_set(cfg.dev, &rtc_counter);
+		if (ret)
+			goto rtc_error;
 	}
-
-	if( cfg.rtc_reset) {
-		operation = 0;
-		printf("Resetting RTC Counter\n");
-	}
-	switch(operation) {
-		case MRPC_RTC_RESET:
-			ret = switchtec_rtc_counter_reset(cfg.dev, &rtc_counter);
-		case MRPC_RTC_SET:
-			ret = switchtec_rtc_counter_set(cfg.dev,  &rtc_counter);
-		case MRPC_RTC_GET:
-			ret = switchtec_rtc_counter_get(cfg.dev, &rtc_counter);
-
-	}
-	if (ret) {
-		perror("rtc");
-		return 1;
-	}
-	
-	if (operation == MRPC_RTC_GET || cfg.rtc_reset)
+	if (!cfg.rtc_counter || cfg.rtc_reset) {
+		ret = switchtec_rtc_counter_get(cfg.dev, &rtc_counter);
+		if (ret)
+			goto rtc_error;
+		
 		printf("RTC Counter: %ld microseconds, %ld seconds\n", rtc_counter, rtc_counter / 1000000);
+	}
 	printf("RTC operation successful\n");
 
 	return 0;
+
+rtc_error:
+	perror("rtc");
+	return 1;
 }
 
 static const struct cmd commands[] = {
