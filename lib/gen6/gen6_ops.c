@@ -29,6 +29,9 @@
 
 #include "../switchtec_priv.h"
 
+extern int switchtec_diag_ltssm_log_gen6(struct switchtec_dev *dev,
+				 int port, int *log_count, void *log_data);
+
 /**
  * @brief Gen6-specific operations vtable
  */
@@ -48,7 +51,7 @@ const struct switchtec_gen_ops switchtec_gen6_ops = {
 	.diag_pattern_mon_set = NULL,
 	.diag_pattern_mon_get = NULL,
 	.diag_pattern_inject = NULL,
-	.diag_ltssm_log = NULL,
+	.diag_ltssm_log = switchtec_diag_ltssm_log_gen6,
 	.diag_ltssm_log_set = NULL,
 	.diag_port_eq_tx_coeff = NULL,
 	.diag_port_eq_tx_table = NULL,
