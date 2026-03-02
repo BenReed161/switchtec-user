@@ -28,6 +28,28 @@
  */
 
 #include "switchtec_priv.h"
+#include "switchtec/diag.h"
+#include "switchtec/switchtec.h"
+
+#include <stdint.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+
+/* Gen3 Version uses Gen4 version */
+extern int switchtec_diag_port_eq_tx_coeff_gen4(struct switchtec_dev *dev,
+						int port_id, int prev_speed,
+						int end, int link, void *res);
+
+extern int switchtec_diag_port_eq_tx_table_gen4(struct switchtec_dev *dev,
+						int port_id, int prev_speed,
+						int link, void *res);
+
+extern int switchtec_diag_port_eq_tx_fslf_gen4(struct switchtec_dev *dev,
+					       int port_id, int prev_speed,
+					       int lane_id, int end, int link,
+					       void *res);
 
 /**
  * @brief Gen3-specific operations vtable
@@ -53,9 +75,9 @@ const struct switchtec_gen_ops switchtec_gen3_ops = {
 	.diag_pattern_inject = NULL,
 	.diag_ltssm_log = NULL, //Not supported
 	.diag_ltssm_log_set = NULL, //Not supported
-	.diag_port_eq_tx_coeff = NULL,
-	.diag_port_eq_tx_table = NULL,
-	.diag_port_eq_tx_fslf = NULL,
+	.diag_port_eq_tx_coeff = switchtec_diag_port_eq_tx_coeff_gen4,
+	.diag_port_eq_tx_table = switchtec_diag_port_eq_tx_table_gen4,
+	.diag_port_eq_tx_fslf = switchtec_diag_port_eq_tx_fslf_gen4,
 	.diag_rcvr_obj = NULL,
 	.diag_rcvr_ext = NULL,
 	.diag_refclk_ctl = NULL,

@@ -25,7 +25,11 @@
 #include "../switchtec_priv.h"
 #include "switchtec/diag.h"
 #include "switchtec/switchtec.h"
+
 #include <stdint.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 /**
  * @brief Get the LTSSM log of a port on a gen4 switchtec device
@@ -145,6 +149,165 @@ int switchtec_diag_ltssm_log_gen4(struct switchtec_dev *dev,
 			    sizeof(ltssm_freeze), NULL, 0);
 
 	return ret;
+}
+
+int switchtec_diag_port_eq_tx_coeff_gen4(struct switchtec_dev *dev,
+					 int port_id, int prev_speed,
+					 int end, int link, void *res)
+{
+	struct switchtec_port_eq_coeff *coeff = res;
+	struct switchtec_diag_port_eq_status_out out = {};
+	struct switchtec_diag_port_eq_status_in in = {
+		.op_type = DIAG_PORT_EQ_STATUS_OP_PER_PORT,
+		.port_id = port_id,
+	};
+	struct switchtec_diag_ext_dump_coeff_prev_in in_prev = {
+		.op_type = DIAG_PORT_EQ_STATUS_OP_PER_PORT,
+		.port_id = port_id,
+	};
+	int ret, i;
+
+	if (!coeff) {
+		errno = -EINVAL;
+		return -1;
+	}
+
+	if (end == SWITCHTEC_DIAG_LOCAL) {
+		in.sub_cmd = MRPC_PORT_EQ_LOCAL_TX_COEFF_DUMP;
+		in_prev.sub_cmd = MRPC_EXT_RCVR_OBJ_DUMP_LOCAL_TX_COEFF_PREV;
+	} else if (end == SWITCHTEC_DIAG_FAR_END) {
+		in.sub_cmd = MRPC_PORT_EQ_FAR_END_TX_COEFF_DUMP;
+		in_prev.sub_cmd = MRPC_EXT_RCVR_OBJ_DUMP_FAR_END_TX_COEFF_PREV;
+	} else {
+		errno = -EINVAL;
+		return -1;
+	}
+
+	if (link == SWITCHTEC_DIAG_LINK_CURRENT) {
+		ret = switchtec_cmd(dev, MRPC_PORT_EQ_STATUS, &in, sizeof(in),
+				    &out, sizeof(out));
+	} else if (link == SWITCHTEC_DIAG_LINK_PREVIOUS) {
+		ret = switchtec_cmd(dev, MRPC_EXT_RCVR_OBJ_DUMP, &in_prev,
+				    sizeof(in_prev), &out, sizeof(out));
+	} else {
+		errno = -EINVAL;
+		return -1;
+	}
+
+	if (ret)
+		return -1;
+
+	coeff->lane_cnt = out.lane_id + 1;
+	for (i = 0; i < coeff->lane_cnt; i++) {
+		coeff->cursors[i].pre = out.cursors[i].pre;
+		coeff->cursors[i].post = out.cursors[i].post;
+	}
+
+	return 0;
+}
+
+int switchtec_diag_port_eq_tx_table_gen4(struct switchtec_dev *dev,
+					 int port_id, int prev_speed,
+					 int link, void *res)
+{
+	struct switchtec_port_eq_table *table = res;
+	struct switchtec_diag_port_eq_table_out out = {};
+	struct switchtec_diag_port_eq_status_in2 in = {
+		.sub_cmd = MRPC_PORT_EQ_FAR_END_TX_EQ_TABLE_DUMP,
+		.port_id = port_id,
+	};
+	struct switchtec_diag_port_eq_status_in2 in_prev = {
+		.sub_cmd = MRPC_EXT_RCVR_OBJ_DUMP_EQ_TX_TABLE_PREV,
+		.port_id = port_id,
+	};
+	int ret, i;
+
+	if (!table) {
+		errno = -EINVAL;
+		return -1;
+	}
+
+	if (link == SWITCHTEC_DIAG_LINK_CURRENT) {
+		ret = switchtec_cmd(dev, MRPC_PORT_EQ_STATUS, &in, sizeof(in),
+				    &out, sizeof(out));
+	} else if (link == SWITCHTEC_DIAG_LINK_PREVIOUS) {
+		ret = switchtec_cmd(dev, MRPC_EXT_RCVR_OBJ_DUMP, &in_prev,
+				    sizeof(in_prev), &out, sizeof(out));
+	} else {
+		errno = -EINVAL;
+		return -1;
+	}
+
+	if (ret)
+		return -1;
+
+	table->lane_id = out.lane_id;
+	table->step_cnt = out.step_cnt;
+	for (i = 0; i < table->step_cnt; i++) {
+		table->steps[i].pre_cursor = out.steps[i].pre_cursor;
+		table->steps[i].post_cursor = out.steps[i].post_cursor;
+		table->steps[i].fom = out.steps[i].fom;
+		table->steps[i].pre_cursor_up = out.steps[i].pre_cursor_up;
+		table->steps[i].post_cursor_up = out.steps[i].post_cursor_up;
+		table->steps[i].error_status = out.steps[i].error_status;
+		table->steps[i].active_status = out.steps[i].active_status;
+		table->steps[i].speed = out.steps[i].speed;
+	}
+
+	return 0;
+}
+
+int switchtec_diag_port_eq_tx_fslf_gen4(struct switchtec_dev *dev,
+					int port_id, int prev_speed,
+					int lane_id, int end, int link,
+					void *res)
+{
+	struct switchtec_port_eq_tx_fslf *fslf = res;
+	struct switchtec_diag_port_eq_tx_fslf_out out = {};
+	struct switchtec_diag_port_eq_status_in2 in = {
+		.port_id = port_id,
+		.lane_id = lane_id,
+	};
+	struct switchtec_diag_ext_recv_obj_dump_in in_prev = {
+		.port_id = port_id,
+		.lane_id = lane_id,
+	};
+	int ret;
+
+	if (!fslf) {
+		errno = -EINVAL;
+		return -1;
+	}
+
+	if (end == SWITCHTEC_DIAG_LOCAL) {
+		in.sub_cmd = MRPC_PORT_EQ_LOCAL_TX_FSLF_DUMP;
+		in_prev.sub_cmd = MRPC_EXT_RCVR_OBJ_DUMP_LOCAL_TX_FSLF_PREV;
+	} else if (end == SWITCHTEC_DIAG_FAR_END) {
+		in.sub_cmd = MRPC_PORT_EQ_FAR_END_TX_FSLF_DUMP;
+		in_prev.sub_cmd = MRPC_EXT_RCVR_OBJ_DUMP_FAR_END_TX_FSLF_PREV;
+	} else {
+		errno = -EINVAL;
+		return -1;
+	}
+
+	if (link == SWITCHTEC_DIAG_LINK_CURRENT) {
+		ret = switchtec_cmd(dev, MRPC_PORT_EQ_STATUS, &in, sizeof(in),
+				    &out, sizeof(out));
+	} else if (link == SWITCHTEC_DIAG_LINK_PREVIOUS) {
+		ret = switchtec_cmd(dev, MRPC_EXT_RCVR_OBJ_DUMP, &in_prev,
+				    sizeof(in_prev), &out, sizeof(out));
+	} else {
+		errno = -EINVAL;
+		return -1;
+	}
+
+	if (ret)
+		return -1;
+
+	fslf->fs = out.fs;
+	fslf->lf = out.lf;
+
+	return 0;
 }
 
 // add more..

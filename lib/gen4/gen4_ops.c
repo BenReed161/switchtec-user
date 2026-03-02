@@ -32,6 +32,18 @@
 extern int switchtec_diag_ltssm_log_gen4(struct switchtec_dev *dev,
 				 int port, int *log_count, void *log_data);
 
+extern int switchtec_diag_port_eq_tx_coeff_gen4(struct switchtec_dev *dev,
+						int port_id, int prev_speed,
+						int end, int link, void *res);
+
+extern int switchtec_diag_port_eq_tx_table_gen4(struct switchtec_dev *dev,
+						int port_id, int prev_speed,
+						int link, void *res);
+
+extern int switchtec_diag_port_eq_tx_fslf_gen4(struct switchtec_dev *dev,
+					       int port_id, int prev_speed,
+					       int lane_id, int end, int link,
+					       void *res);
 /**
  * @brief Gen4-specific operations vtable
  */
@@ -53,9 +65,9 @@ const struct switchtec_gen_ops switchtec_gen4_ops = {
 	.diag_pattern_inject = NULL,
 	.diag_ltssm_log = switchtec_diag_ltssm_log_gen4,
 	.diag_ltssm_log_set = NULL,
-	.diag_port_eq_tx_coeff = NULL,
-	.diag_port_eq_tx_table = NULL,
-	.diag_port_eq_tx_fslf = NULL,
+	.diag_port_eq_tx_coeff = switchtec_diag_port_eq_tx_coeff_gen4,
+	.diag_port_eq_tx_table = switchtec_diag_port_eq_tx_table_gen4,
+	.diag_port_eq_tx_fslf = switchtec_diag_port_eq_tx_fslf_gen4,
 	.diag_rcvr_obj = NULL,
 	.diag_rcvr_ext = NULL,
 	.diag_refclk_ctl = NULL,
