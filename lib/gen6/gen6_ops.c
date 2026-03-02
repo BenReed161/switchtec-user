@@ -59,6 +59,25 @@ extern int switchtec_diag_cross_hair_disable_gen4(struct switchtec_dev *dev);
 extern int switchtec_diag_cross_hair_get_gen4(struct switchtec_dev *dev,
 					      int start_lane_id, int num_lanes,
 					      void *res);
+
+extern int switchtec_diag_pattern_gen_set_gen6(struct switchtec_dev *dev,
+					       int port_id, int type,
+					       int link_speed);
+
+extern int switchtec_diag_pattern_gen_get_gen6(struct switchtec_dev *dev,
+					       int port_id, int *type);
+
+extern int switchtec_diag_pattern_mon_set_gen6(struct switchtec_dev *dev,
+					       int port_id, int type);
+
+extern int switchtec_diag_pattern_mon_get_gen6(struct switchtec_dev *dev,
+					       int port_id, int lane_id,
+					       int *type,
+					       unsigned long long *err_cnt);
+
+/* Gen6 reuses gen4 pattern_inject */
+extern int switchtec_diag_pattern_inject_gen4(struct switchtec_dev *dev,
+					      int port_id, int err_cnt);
 /**
  * @brief Gen6-specific operations vtable
  */
@@ -74,11 +93,11 @@ const struct switchtec_gen_ops switchtec_gen6_ops = {
 	.diag_eye_read = NULL,
 	.diag_loopback_set = switchtec_diag_loopback_set_gen5,
 	.diag_loopback_get = switchtec_diag_loopback_get_gen5,
-	.diag_pattern_gen_set = NULL,
-	.diag_pattern_gen_get = NULL,
-	.diag_pattern_mon_set = NULL,
-	.diag_pattern_mon_get = NULL,
-	.diag_pattern_inject = NULL,
+	.diag_pattern_gen_set = switchtec_diag_pattern_gen_set_gen6,
+	.diag_pattern_gen_get = switchtec_diag_pattern_gen_get_gen6,
+	.diag_pattern_mon_set = switchtec_diag_pattern_mon_set_gen6,
+	.diag_pattern_mon_get = switchtec_diag_pattern_mon_get_gen6,
+	.diag_pattern_inject = switchtec_diag_pattern_inject_gen4,
 	.diag_ltssm_log = switchtec_diag_ltssm_log_gen6,
 	.diag_ltssm_log_set = NULL,
 	.diag_port_eq_tx_coeff = NULL,

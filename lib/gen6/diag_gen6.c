@@ -234,3 +234,76 @@ int switchtec_diag_eye_start_gen6(struct switchtec_dev *dev, int lane_mask[4],
 	errno = err;
 	return ret;
 }
+
+int switchtec_diag_pattern_gen_set_gen6(struct switchtec_dev *dev, int port_id,
+					int type, int link_speed)
+{
+	struct switchtec_diag_pat_gen_in in = {
+		.sub_cmd = MRPC_PAT_GEN_SET_GEN_GEN6,
+		.port_id = port_id,
+		.pattern_type = type,
+		.lane_id = link_speed
+	};
+
+	return switchtec_cmd(dev, MRPC_PAT_GEN, &in, sizeof(in), NULL, 0);
+}
+
+int switchtec_diag_pattern_gen_get_gen6(struct switchtec_dev *dev, int port_id,
+					int *type)
+{
+	struct switchtec_diag_pat_gen_in in = {
+		.sub_cmd = MRPC_PAT_GEN_GET_GEN_GEN6,
+		.port_id = port_id,
+	};
+	struct switchtec_diag_pat_gen_out out;
+	int ret;
+
+	ret = switchtec_cmd(dev, MRPC_PAT_GEN, &in, sizeof(in), &out,
+			    sizeof(out));
+	if (ret)
+		return ret;
+
+	if (type)
+		*type = out.pattern_type;
+
+	return 0;
+}
+
+int switchtec_diag_pattern_mon_set_gen6(struct switchtec_dev *dev, int port_id,
+					int type)
+{
+	struct switchtec_diag_pat_gen_in in = {
+		.sub_cmd = MRPC_PAT_GEN_SET_MON_GEN6,
+		.port_id = port_id,
+		.pattern_type = type,
+	};
+
+	return switchtec_cmd(dev, MRPC_PAT_GEN, &in, sizeof(in), NULL, 0);
+}
+
+int switchtec_diag_pattern_mon_get_gen6(struct switchtec_dev *dev, int port_id,
+					int lane_id, int *type,
+					unsigned long long *err_cnt)
+{
+	struct switchtec_diag_pat_gen_in in = {
+		.sub_cmd = MRPC_PAT_GEN_GET_MON_GEN6,
+		.port_id = port_id,
+		.lane_id = lane_id,
+	};
+	struct switchtec_diag_pat_gen_out out;
+	int ret;
+
+	ret = switchtec_cmd(dev, MRPC_PAT_GEN, &in, sizeof(in), &out,
+			    sizeof(out));
+	if (ret)
+		return ret;
+
+	if (type)
+		*type = out.pattern_type;
+
+	if (err_cnt)
+		*err_cnt = (htole32(out.err_cnt_lo) |
+			    ((uint64_t)htole32(out.err_cnt_hi) << 32));
+
+	return 0;
+}

@@ -607,3 +607,16 @@ int switchtec_diag_eye_read_gen5(struct switchtec_dev *dev, int lane_id,
 
 	return ret;
 }
+
+int switchtec_diag_pattern_gen_set_gen5(struct switchtec_dev *dev, int port_id,
+					int type, int link_speed)
+{
+	struct switchtec_diag_pat_gen_in in = {
+		.sub_cmd = MRPC_PAT_GEN_SET_GEN_GEN5,
+		.port_id = port_id,
+		.pattern_type = type,
+		.lane_id = link_speed
+	};
+
+	return switchtec_cmd(dev, MRPC_PAT_GEN, &in, sizeof(in), NULL, 0);
+}
