@@ -348,46 +348,11 @@ int switchtec_diag_rcvr_obj(struct switchtec_dev *dev, int port_id,
 		int lane_id, enum switchtec_diag_link link,
 		struct switchtec_rcvr_obj *res)
 {
-	struct switchtec_diag_rcvr_obj_dump_out out = {};
-	struct switchtec_diag_rcvr_obj_dump_in in = {
-		.port_id = port_id,
-		.lane_id = lane_id,
-	};
-	struct switchtec_diag_ext_recv_obj_dump_in ext_in = {
-		.sub_cmd = MRPC_EXT_RCVR_OBJ_DUMP_PREV,
-		.port_id = port_id,
-		.lane_id = lane_id,
-	};
-	int i, ret;
-
-	if (!res) {
-		errno = -EINVAL;
-		return -1;
-	}
-
-	if (link == SWITCHTEC_DIAG_LINK_CURRENT) {
-		ret = switchtec_cmd(dev, MRPC_RCVR_OBJ_DUMP, &in, sizeof(in),
-				    &out, sizeof(out));
-	} else if (link == SWITCHTEC_DIAG_LINK_PREVIOUS) {
-		ret = switchtec_cmd(dev, MRPC_EXT_RCVR_OBJ_DUMP, &ext_in,
-				    sizeof(ext_in), &out, sizeof(out));
-	} else {
-		errno = -EINVAL;
-		return -1;
-	}
-
-	if (ret)
-		return -1;
-
-	res->port_id = out.port_id;
-	res->lane_id = out.lane_id;
-	res->ctle = out.ctle;
-	res->target_amplitude = out.target_amplitude;
-	res->speculative_dfe = out.speculative_dfe;
-	for (i = 0; i < ARRAY_SIZE(res->dynamic_dfe); i++)
-		res->dynamic_dfe[i] = out.dynamic_dfe[i];
-
-	return 0;
+	if (GEN_OPS(dev) && GEN_OPS(dev)->diag_rcvr_obj)
+		return GEN_OPS(dev)->diag_rcvr_obj(dev, port_id, lane_id,
+						   link, res);
+	errno = ENOTSUP;
+	return -1;
 }
 
 /**

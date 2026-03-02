@@ -78,6 +78,10 @@ extern int switchtec_diag_pattern_mon_get_gen6(struct switchtec_dev *dev,
 /* Gen6 reuses gen4 pattern_inject */
 extern int switchtec_diag_pattern_inject_gen4(struct switchtec_dev *dev,
 					      int port_id, int err_cnt);
+
+/* Gen6 reuses gen4 rcvr_obj */
+extern int switchtec_diag_rcvr_obj_gen4(struct switchtec_dev *dev, int port_id,
+					int lane_id, int link, void *res);
 /**
  * @brief Gen6-specific operations vtable
  */
@@ -103,7 +107,7 @@ const struct switchtec_gen_ops switchtec_gen6_ops = {
 	.diag_port_eq_tx_coeff = NULL,
 	.diag_port_eq_tx_table = NULL,
 	.diag_port_eq_tx_fslf = NULL,
-	.diag_rcvr_obj = NULL,
+	.diag_rcvr_obj = switchtec_diag_rcvr_obj_gen4,
 	.diag_rcvr_ext = NULL,
 	.diag_refclk_ctl = NULL,
 	.inject_err_tlp_lcrc = NULL,
