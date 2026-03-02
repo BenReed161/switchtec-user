@@ -32,6 +32,18 @@
 extern int switchtec_diag_ltssm_log_gen6(struct switchtec_dev *dev,
 				 int port, int *log_count, void *log_data);
 
+/* Gen6 shares loopback implementation with Gen5 */
+extern int switchtec_diag_loopback_set_gen5(struct switchtec_dev *dev,
+					    int port_id, int enable,
+					    int enable_parallel,
+					    int enable_external,
+					    int enable_ltssm, int enable_pipe,
+					    int ltssm_speed);
+
+extern int switchtec_diag_loopback_get_gen5(struct switchtec_dev *dev,
+					    int port_id, int *enabled,
+					    int *ltssm_speed);
+
 /**
  * @brief Gen6-specific operations vtable
  */
@@ -44,8 +56,8 @@ const struct switchtec_gen_ops switchtec_gen6_ops = {
 	.diag_eye_start = NULL,
 	.diag_eye_fetch = NULL,
 	.diag_eye_cancel = NULL,
-	.diag_loopback_set = NULL,
-	.diag_loopback_get = NULL,
+	.diag_loopback_set = switchtec_diag_loopback_set_gen5,
+	.diag_loopback_get = switchtec_diag_loopback_get_gen5,
 	.diag_pattern_gen_set = NULL,
 	.diag_pattern_gen_get = NULL,
 	.diag_pattern_mon_set = NULL,
