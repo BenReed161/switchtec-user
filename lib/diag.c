@@ -646,16 +646,10 @@ int switchtec_aer_event_gen(struct switchtec_dev *dev, int port_id,
 int switchtec_inject_err_dllp(struct switchtec_dev *dev, int phys_port_id,
 			      int data)
 {
-	uint32_t output;
-
-	struct switchtec_lnkerr_dllp_in cmd = {
-		.subcmd = MRPC_ERR_INJ_DLLP,
-		.phys_port_id = phys_port_id,
-		.data = data,
-	};
-
-	return switchtec_cmd(dev, MRPC_MRPC_ERR_INJ, &cmd,
-			     sizeof(cmd), &output, sizeof(output));
+	if (GEN_OPS(dev) && GEN_OPS(dev)->inject_err_dllp)
+		return GEN_OPS(dev)->inject_err_dllp(dev, phys_port_id, data);
+	errno = ENOTSUP;
+	return -1;
 }
 
 /**
@@ -670,52 +664,11 @@ int switchtec_inject_err_dllp_crc(struct switchtec_dev *dev,
 				  int phys_port_id, int enable,
 				  uint16_t rate)
 {
-	uint32_t output;
-
-	struct switchtec_lnkerr_dllp_crc_in cmd = {
-		.subcmd = MRPC_ERR_INJ_DLLP_CRC,
-		.phys_port_id = phys_port_id,
-		.enable = enable,
-		.rate = rate,
-	};
-
-	return switchtec_cmd(dev, MRPC_MRPC_ERR_INJ, &cmd,
-			     sizeof(cmd), &output, sizeof(output));
-}
-
-static int switchtec_inject_err_tlp_lcrc_gen4(struct switchtec_dev *dev,
-					      int phys_port_id, int enable,
-					      uint8_t rate)
-{
-	uint32_t output;
-
-	struct switchtec_lnkerr_tlp_lcrc_gen4_in cmd = {
-		.subcmd = MRPC_ERR_INJ_TLP_LCRC,
-		.phys_port_id = phys_port_id,
-		.enable = enable,
-		.rate = rate,
-	};
-	printf("enable: %d\n", enable);
-
-	return switchtec_cmd(dev, MRPC_MRPC_ERR_INJ, &cmd,
-			     sizeof(cmd), &output, sizeof(output));
-}
-
-static int switchtec_inject_err_tlp_lcrc_gen5(struct switchtec_dev *dev,
-					      int phys_port_id, int enable,
-					      uint8_t rate)
-{
-	uint32_t output;
-
-	struct switchtec_lnkerr_tlp_lcrc_gen5_in cmd = {
-		.subcmd = MRPC_ERR_INJ_TLP_LCRC,
-		.phys_port_id = phys_port_id,
-		.enable = enable,
-		.rate = rate,
-	};
-
-	return switchtec_cmd(dev, MRPC_MRPC_ERR_INJ, &cmd,
-			     sizeof(cmd), &output, sizeof(output));
+	if (GEN_OPS(dev) && GEN_OPS(dev)->inject_err_dllp_crc)
+		return GEN_OPS(dev)->inject_err_dllp_crc(dev, phys_port_id,
+							 enable, rate);
+	errno = ENOTSUP;
+	return -1;
 }
 
 /**
@@ -728,15 +681,10 @@ static int switchtec_inject_err_tlp_lcrc_gen5(struct switchtec_dev *dev,
 int switchtec_inject_err_tlp_lcrc(struct switchtec_dev *dev, int phy_port,
 				  int enable, uint8_t rate)
 {
-	int ret;
-	if (switchtec_is_gen4(dev)) {
-		ret = switchtec_inject_err_tlp_lcrc_gen4(dev, phy_port, enable, rate);
-		return ret;
-	} else if (switchtec_is_gen5(dev)) {
-		ret = switchtec_inject_err_tlp_lcrc_gen5(dev, phy_port, enable, rate);
-		return ret;
-	}
-	fprintf(stderr, "The TLP LCRC is not supported for Gen3 switches.\n");
+	if (GEN_OPS(dev) && GEN_OPS(dev)->inject_err_tlp_lcrc)
+		return GEN_OPS(dev)->inject_err_tlp_lcrc(dev, phy_port,
+							 enable, rate);
+	errno = ENOTSUP;
 	return -1;
 }
 
@@ -748,15 +696,10 @@ int switchtec_inject_err_tlp_lcrc(struct switchtec_dev *dev, int phy_port,
  */
 int switchtec_inject_err_tlp_seq_num(struct switchtec_dev *dev, int phys_port_id)
 {
-	uint32_t output;
-
-	struct switchtec_lnkerr_tlp_seqn_in cmd = {
-		.subcmd = MRPC_ERR_INJ_TLP_SEQ,
-		.phys_port_id = phys_port_id,
-	};
-
-	return switchtec_cmd(dev, MRPC_MRPC_ERR_INJ, &cmd,
-			     sizeof(cmd), &output, sizeof(output));
+	if (GEN_OPS(dev) && GEN_OPS(dev)->inject_err_tlp_seqnum)
+		return GEN_OPS(dev)->inject_err_tlp_seqnum(dev, phys_port_id);
+	errno = ENOTSUP;
+	return -1;
 }
 
 /**
@@ -770,17 +713,10 @@ int switchtec_inject_err_tlp_seq_num(struct switchtec_dev *dev, int phys_port_id
 int switchtec_inject_err_ack_nack(struct switchtec_dev *dev, int phys_port_id,
 				  uint16_t seq_num, uint8_t count)
 {
-	uint32_t output;
-
-	struct switchtec_lnkerr_ack_nack_in cmd = {
-		.subcmd = MRPC_ERR_INJ_ACK_NACK,
-		.phys_port_id = phys_port_id,
-		.seq_num = seq_num,
-		.count = count,
-	};
-
-	return switchtec_cmd(dev, MRPC_MRPC_ERR_INJ, &cmd,
-			     sizeof(cmd), &output, sizeof(output));
+	if (GEN_OPS(dev) && GEN_OPS(dev)->inject_err_ack_nack)
+		return GEN_OPS(dev)->inject_err_ack_nack(dev, phys_port_id, seq_num, count);
+	errno = ENOTSUP;
+	return -1;
 }
 
 /**
@@ -791,15 +727,10 @@ int switchtec_inject_err_ack_nack(struct switchtec_dev *dev, int phys_port_id,
  */
 int switchtec_inject_err_cto(struct switchtec_dev *dev, int phys_port_id)
 {
-	uint32_t output;
-
-	struct switchtec_lnkerr_cto_in cmd = {
-		.subcmd = MRPC_ERR_INJ_CTO,
-		.phys_port_id = phys_port_id,
-	};
-
-	return switchtec_cmd(dev, MRPC_MRPC_ERR_INJ, &cmd,
-			     sizeof(cmd), &output, sizeof(output));
+	if (GEN_OPS(dev) && GEN_OPS(dev)->inject_err_cto)
+		return GEN_OPS(dev)->inject_err_cto(dev, phys_port_id);
+	errno = ENOTSUP;
+	return -1;
 }
 
 int switchtec_osa_capture_data(struct switchtec_dev *dev, int stack_id,

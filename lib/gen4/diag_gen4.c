@@ -788,3 +788,83 @@ int switchtec_diag_rcvr_obj_gen4(struct switchtec_dev *dev, int port_id,
 
 	return 0;
 }
+
+int switchtec_inject_err_tlp_lcrc_gen4(struct switchtec_dev *dev,
+				       int phys_port_id, int enable,
+				       uint8_t rate)
+{
+	uint32_t output;
+
+	struct switchtec_lnkerr_tlp_lcrc_gen4_in cmd = {
+		.subcmd = MRPC_ERR_INJ_TLP_LCRC,
+		.phys_port_id = phys_port_id,
+		.enable = enable,
+		.rate = rate,
+	};
+
+	return switchtec_cmd(dev, MRPC_MRPC_ERR_INJ, &cmd,
+			     sizeof(cmd), &output, sizeof(output));
+}
+
+int switchtec_inject_err_tlp_seqnum_gen4(struct switchtec_dev *dev,
+					 int phys_port_id)
+{
+	uint32_t output;
+
+	struct switchtec_lnkerr_tlp_seqn_in cmd = {
+		.subcmd = MRPC_ERR_INJ_TLP_SEQ,
+		.phys_port_id = phys_port_id,
+	};
+
+	return switchtec_cmd(dev, MRPC_MRPC_ERR_INJ, &cmd,
+			     sizeof(cmd), &output, sizeof(output));
+}
+
+int switchtec_inject_err_dllp_gen4(struct switchtec_dev *dev, int phys_port_id,
+				   int data)
+{
+	uint32_t output;
+
+	struct switchtec_lnkerr_dllp_in cmd = {
+		.subcmd = MRPC_ERR_INJ_DLLP,
+		.phys_port_id = phys_port_id,
+		.data = data,
+	};
+
+	return switchtec_cmd(dev, MRPC_MRPC_ERR_INJ, &cmd,
+			     sizeof(cmd), &output, sizeof(output));
+}
+
+int switchtec_inject_err_dllp_crc_gen4(struct switchtec_dev *dev,
+				       int phys_port_id, int enable,
+				       uint16_t rate)
+{
+	uint32_t output;
+
+	struct switchtec_lnkerr_dllp_crc_in cmd = {
+		.subcmd = MRPC_ERR_INJ_DLLP_CRC,
+		.phys_port_id = phys_port_id,
+		.enable = enable,
+		.rate = rate,
+	};
+
+	return switchtec_cmd(dev, MRPC_MRPC_ERR_INJ, &cmd,
+			     sizeof(cmd), &output, sizeof(output));
+}
+
+int switchtec_inject_err_ack_nack_gen4(struct switchtec_dev *dev,
+				       int phys_port_id, uint16_t seq_num,
+				       uint8_t count)
+{
+	uint32_t output;
+
+	struct switchtec_lnkerr_ack_nack_in cmd = {
+		.subcmd = MRPC_ERR_INJ_ACK_NACK,
+		.phys_port_id = phys_port_id,
+		.seq_num = seq_num,
+		.count = count,
+	};
+
+	return switchtec_cmd(dev, MRPC_MRPC_ERR_INJ, &cmd,
+			     sizeof(cmd), &output, sizeof(output));
+}

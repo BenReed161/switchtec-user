@@ -94,9 +94,11 @@ const struct switchtec_gen_ops switchtec_gen3_ops = {
 	.diag_rcvr_ext = NULL,
 	.diag_refclk_ctl = NULL,
 	.inject_err_tlp_lcrc = NULL,
+	.inject_err_cto = NULL,
+	.inject_err_ack_nack = NULL,
 	.inject_err_tlp_seqnum = NULL,
 	.inject_err_tlp_ecrc = NULL,
-	.inject_err_dup_dllp = NULL,
+	.inject_err_dllp_crc = NULL,
 	.inject_err_dup_tlp = NULL,
 
 	/* Manufacturing - Gen3 uses different structures */

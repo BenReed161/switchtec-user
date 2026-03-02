@@ -82,6 +82,29 @@ extern int switchtec_diag_pattern_inject_gen4(struct switchtec_dev *dev,
 /* Gen6 reuses gen4 rcvr_obj */
 extern int switchtec_diag_rcvr_obj_gen4(struct switchtec_dev *dev, int port_id,
 					int lane_id, int link, void *res);
+
+/* Gen6 reuses gen5 inject_err_tlp_lcrc */
+extern int switchtec_inject_err_tlp_lcrc_gen5(struct switchtec_dev *dev,
+					      int phys_port_id, int enable,
+					      uint8_t rate);
+
+/* Gen6 reuses gen4 inject_err functions */
+extern int switchtec_inject_err_tlp_seqnum_gen4(struct switchtec_dev *dev,
+						int phys_port_id);
+
+extern int switchtec_inject_err_ack_nack_gen4(struct switchtec_dev *dev,
+					      int phys_port_id, uint16_t seq_num,
+					      uint8_t count);
+
+extern int switchtec_inject_err_cto_gen4(struct switchtec_dev *dev,
+					 int phys_port_id);
+
+extern int switchtec_inject_err_dllp_gen4(struct switchtec_dev *dev,
+					  int phys_port_id, int data);
+
+extern int switchtec_inject_err_dllp_crc_gen4(struct switchtec_dev *dev,
+					      int phys_port_id, int enable,
+					      uint16_t rate);
 /**
  * @brief Gen6-specific operations vtable
  */
@@ -110,10 +133,13 @@ const struct switchtec_gen_ops switchtec_gen6_ops = {
 	.diag_rcvr_obj = switchtec_diag_rcvr_obj_gen4,
 	.diag_rcvr_ext = NULL,
 	.diag_refclk_ctl = NULL,
-	.inject_err_tlp_lcrc = NULL,
-	.inject_err_tlp_seqnum = NULL,
+	.inject_err_tlp_lcrc = switchtec_inject_err_tlp_lcrc_gen5,
+	.inject_err_cto = NULL,
+	.inject_err_ack_nack = switchtec_inject_err_ack_nack_gen4,
+	.inject_err_tlp_seqnum = switchtec_inject_err_tlp_seqnum_gen4,
 	.inject_err_tlp_ecrc = NULL,
-	.inject_err_dup_dllp = NULL,
+	.inject_err_dllp_crc = switchtec_inject_err_dllp_crc_gen4,
+	.inject_err_dllp = NULL,
 	.inject_err_dup_tlp = NULL,
 
 	/* Manufacturing */

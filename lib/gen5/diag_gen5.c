@@ -620,3 +620,34 @@ int switchtec_diag_pattern_gen_set_gen5(struct switchtec_dev *dev, int port_id,
 
 	return switchtec_cmd(dev, MRPC_PAT_GEN, &in, sizeof(in), NULL, 0);
 }
+
+int switchtec_inject_err_tlp_lcrc_gen5(struct switchtec_dev *dev,
+				       int phys_port_id, int enable,
+				       uint8_t rate)
+{
+	uint32_t output;
+
+	struct switchtec_lnkerr_tlp_lcrc_gen5_in cmd = {
+		.subcmd = MRPC_ERR_INJ_TLP_LCRC,
+		.phys_port_id = phys_port_id,
+		.enable = enable,
+		.rate = rate,
+	};
+
+	return switchtec_cmd(dev, MRPC_MRPC_ERR_INJ, &cmd,
+			     sizeof(cmd), &output, sizeof(output));
+}
+
+int switchtec_inject_err_cto_gen5(struct switchtec_dev *dev, int phys_port_id)
+{
+	uint32_t output;
+
+	struct switchtec_lnkerr_cto_in cmd = {
+		.subcmd = MRPC_ERR_INJ_CTO,
+		.phys_port_id = phys_port_id,
+	};
+
+	return switchtec_cmd(dev, MRPC_MRPC_ERR_INJ, &cmd,
+			     sizeof(cmd), &output, sizeof(output));
+}
+

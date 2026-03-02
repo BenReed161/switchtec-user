@@ -169,14 +169,18 @@ struct switchtec_gen_ops {
 
 	int (*inject_err_tlp_lcrc)(struct switchtec_dev *dev, int phys_port,
 				   int enable, uint8_t rate);
-	int (*inject_err_tlp_seqnum)(struct switchtec_dev *dev, int phys_port,
-				     int enable, uint8_t rate);
+	int (*inject_err_tlp_seqnum)(struct switchtec_dev *dev, int phys_port);
 	int (*inject_err_tlp_ecrc)(struct switchtec_dev *dev, int phys_port,
 				   int enable, uint8_t rate);
-	int (*inject_err_dup_dllp)(struct switchtec_dev *dev, int phys_port,
-				   int enable, uint8_t rate);
+	int (*inject_err_dllp_crc)(struct switchtec_dev *dev, int phys_port,
+				   int enable, uint16_t rate);
+	int (*inject_err_dllp)(struct switchtec_dev *dev, int phys_port_id,
+				int data);
 	int (*inject_err_dup_tlp)(struct switchtec_dev *dev, int phys_port,
 				  int enable, uint8_t rate);
+	int (*inject_err_cto)(struct switchtec_dev *dev, int phys_port_id);
+	int (*inject_err_ack_nack)(struct switchtec_dev *dev, int phys_port_id,
+					uint16_t seq_num, uint8_t count);
 
 	/* Manufacturing */
 	int (*security_config_get)(struct switchtec_dev *dev, void *state);
