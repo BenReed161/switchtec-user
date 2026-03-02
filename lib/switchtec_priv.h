@@ -123,6 +123,8 @@ struct switchtec_gen_ops {
 	int (*diag_eye_fetch)(struct switchtec_dev *dev, double *pixels,
 			      size_t pixel_cnt, int *lane_id);
 	int (*diag_eye_cancel)(struct switchtec_dev *dev);
+	int (*diag_eye_read)(struct switchtec_dev *dev, int lane_id,
+		      	    int bin, int* num_phases, double* ber_data);
 
 	int (*diag_loopback_set)(struct switchtec_dev *dev, int port_id,
 				 int enable, int enable_parallel,

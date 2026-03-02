@@ -25,11 +25,17 @@
 #include "../switchtec_priv.h"
 #include "switchtec/diag.h"
 #include "switchtec/switchtec.h"
+#include "switchtec/endian.h"
+#include "switchtec/utils.h"
 
 #include <stdint.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
+#include <string.h>
+#include <strings.h>
+#include <unistd.h>
 
 static void switchtec_diag_ltssm_set_log_data_gen5(struct switchtec_diag_ltssm_log
 					*log_data,
@@ -491,4 +497,113 @@ int switchtec_diag_loopback_get_gen5(struct switchtec_dev *dev,
 		*ltssm_speed = lt_out.speed;
 
 	return 0;
+}
+
+static int switchtec_diag_eye_status_gen5(struct switchtec_dev *dev)
+{
+	int ret;
+	int eye_status;
+
+	struct switchtec_gen5_diag_eye_status_in in = {
+		.sub_cmd = MRPC_EYE_CAP_STATUS_GEN5,
+	};
+	struct switchtec_gen5_diag_eye_status_out out;
+
+	do {
+		ret = switchtec_cmd(dev, MRPC_GEN5_EYE_CAPTURE, &in, sizeof(in),
+				    &out, sizeof(out));
+		if (ret) {
+			switchtec_perror("eye_status");
+			return -1;
+		}
+		eye_status = out.status;
+		usleep(200000);
+	} while (eye_status == SWITCHTEC_GEN5_DIAG_EYE_STATUS_IN_PROGRESS ||
+		 eye_status == SWITCHTEC_GEN5_DIAG_EYE_STATUS_PENDING);
+
+	switch (eye_status) {
+		case SWITCHTEC_GEN5_DIAG_EYE_STATUS_IDLE:
+			switchtec_perror("Eye capture idle");
+		case SWITCHTEC_GEN5_DIAG_EYE_STATUS_DONE:
+			return 0;
+		case SWITCHTEC_GEN5_DIAG_EYE_STATUS_TIMEOUT:
+			switchtec_perror("Eye capture timeout");
+		case SWITCHTEC_GEN5_DIAG_EYE_STATUS_ERROR:
+			switchtec_perror("Eye capture error");
+		return -1;
+	}
+	switchtec_perror("Unknown eye capture state");
+	return -1;
+}
+
+int switchtec_diag_eye_cmd_gen5(struct switchtec_dev *dev, void *in,
+				       size_t size)
+{
+	int ret;
+
+	ret = switchtec_cmd(dev, MRPC_GEN5_EYE_CAPTURE, in, size,
+			    NULL, 0);
+	if (ret)
+		return ret;
+
+	usleep(200000);
+
+	return switchtec_diag_eye_status_gen5(dev);
+}
+
+int switchtec_diag_eye_start_gen5(struct switchtec_dev *dev, int lane_mask[4],
+				struct range *x_range, struct range *y_range,
+				int step_interval, int capture_depth, int sar_sel,
+				int intleav_sel, int hstep, int data_mode, 
+				int eye_mode, uint64_t refclk, int vstep)
+{
+	int err, ret;
+	struct switchtec_gen5_diag_eye_run_in in = {
+		.sub_cmd = MRPC_EYE_CAP_RUN_GEN5,
+		.capture_depth = capture_depth,
+		.timeout_disable = 1,
+		.lane_mask[0] = lane_mask[0],
+		.lane_mask[1] = lane_mask[1],
+		.lane_mask[2] = lane_mask[2],
+		.lane_mask[3] = lane_mask[3],
+	};
+
+	ret = switchtec_diag_eye_cmd_gen5(dev, &in, sizeof(in));
+	err = errno;
+	errno = err;
+	return ret;
+}
+
+/**
+ * @brief Start a PCIe Eye Read Gen5
+ * @param[in]  dev	       Switchtec device handle
+ * @param[in]  lane_id         lane_id
+ * @param[in]  bin             bin
+ * @param[in]  num_phases      pointer to the number of phases
+ * @param[in]  ber_data        pointer to the Ber data
+ *
+ * @return 0 on success, error code on failure
+ */
+int switchtec_diag_eye_read_gen5(struct switchtec_dev *dev, int lane_id,
+		      	    int bin, int* num_phases, double* ber_data)
+{
+	struct switchtec_gen5_diag_eye_read_in in = {
+		.sub_cmd = MRPC_EYE_CAP_READ_GEN5,
+		.lane_id = lane_id,
+		.bin = bin,
+	};
+	struct switchtec_gen5_diag_eye_read_out out;
+	int i, ret;
+
+	ret = switchtec_cmd(dev, MRPC_GEN5_EYE_CAPTURE, &in, sizeof(in),
+			    &out, sizeof(out));
+	if (ret)
+		return ret;
+
+	*num_phases = out.num_phases;
+
+	for(i = 0; i < out.num_phases; i++)
+		ber_data[i] = le64toh(out.ber_data[i]) / 281474976710656.;
+
+	return ret;
 }

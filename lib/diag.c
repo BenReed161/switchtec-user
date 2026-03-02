@@ -128,89 +128,6 @@ int switchtec_diag_cross_hair_get(struct switchtec_dev *dev, int start_lane_id,
 	return 0;
 }
 
-static int switchtec_diag_eye_status_gen5(struct switchtec_dev *dev)
-{
-	int ret;
-	int eye_status;
-
-	struct switchtec_gen5_diag_eye_status_in in = {
-		.sub_cmd = MRPC_EYE_CAP_STATUS_GEN5,
-	};
-	struct switchtec_gen5_diag_eye_status_out out;
-
-	do {
-		ret = switchtec_cmd(dev, MRPC_GEN5_EYE_CAPTURE, &in, sizeof(in),
-				    &out, sizeof(out));
-		if (ret) {
-			switchtec_perror("eye_status");
-			return -1;
-		}
-		eye_status = out.status;
-		usleep(200000);
-	} while (eye_status == SWITCHTEC_GEN5_DIAG_EYE_STATUS_IN_PROGRESS ||
-		 eye_status == SWITCHTEC_GEN5_DIAG_EYE_STATUS_PENDING);
-
-	switch (eye_status) {
-		case SWITCHTEC_GEN5_DIAG_EYE_STATUS_IDLE:
-			switchtec_perror("Eye capture idle");
-		case SWITCHTEC_GEN5_DIAG_EYE_STATUS_DONE:
-			return 0;
-		case SWITCHTEC_GEN5_DIAG_EYE_STATUS_TIMEOUT:
-			switchtec_perror("Eye capture timeout");
-		case SWITCHTEC_GEN5_DIAG_EYE_STATUS_ERROR:
-			switchtec_perror("Eye capture error");
-		return -1;
-	}
-	switchtec_perror("Unknown eye capture state");
-	return -1;
-}
-
-static int switchtec_diag_eye_status(int status)
-{
-	switch (status) {
-	case 0: return 0;
-	case 2:
-		errno = EINVAL;
-		return -1;
-	case 3:
-		errno = EBUSY;
-		return -1;
-	default:
-		errno = EPROTO;
-		return -1;
-	}
-}
-
-static int switchtec_diag_eye_cmd_gen5(struct switchtec_dev *dev, void *in,
-				       size_t size)
-{
-	int ret;
-
-	ret = switchtec_cmd(dev, MRPC_GEN5_EYE_CAPTURE, in, size,
-			    NULL, 0);
-	if (ret)
-		return ret;
-
-	usleep(200000);
-
-	return switchtec_diag_eye_status_gen5(dev);
-}
-
-static int switchtec_diag_eye_cmd_gen4(struct switchtec_dev *dev, void *in,
-				       size_t size)
-{
-	struct switchtec_diag_port_eye_cmd out;
-	int ret;
-
-	ret = switchtec_cmd(dev, MRPC_EYE_OBSERVE, in, size, &out,
-			    sizeof(out));
-
-	if (ret)
-		return ret;
-
-	return switchtec_diag_eye_status(out.status);
-}
-
 /**
  * @brief Set the data mode for the next Eye Capture
  * @param[in]  dev	       Switchtec device handle
@@ -221,12 +138,10 @@ static int switchtec_diag_eye_cmd_gen4(struct switchtec_dev *dev, void *in,
 int switchtec_diag_eye_set_mode(struct switchtec_dev *dev,
 				enum switchtec_diag_eye_data_mode mode)
 {
-	struct switchtec_diag_port_eye_cmd in = {
-		.sub_cmd = MRPC_EYE_OBSERVE_SET_DATA_MODE,
-		.data_mode = mode,
-	};
-
-	return switchtec_diag_eye_cmd_gen4(dev, &in, sizeof(in));
+	if (GEN_OPS(dev) && GEN_OPS(dev)->diag_eye_set_mode)
+		return GEN_OPS(dev)->diag_eye_set_mode(dev, mode);
+	errno = ENOTSUP;
+	return -1;	
 }
 
 /**
@@ -242,29 +157,10 @@ int switchtec_diag_eye_set_mode(struct switchtec_dev *dev,
 int switchtec_diag_eye_read(struct switchtec_dev *dev, int lane_id,
 		      	    int bin, int* num_phases, double* ber_data)
 {
-	if (dev) {
-		fprintf(stderr, "Eye read not supported on Gen 4 switches.\n");
-		return -1;
-	}
-	struct switchtec_gen5_diag_eye_read_in in = {
-		.sub_cmd = MRPC_EYE_CAP_READ_GEN5,
-		.lane_id = lane_id,
-		.bin = bin,
-	};
-	struct switchtec_gen5_diag_eye_read_out out;
-	int i, ret;
-
-	ret = switchtec_cmd(dev, MRPC_GEN5_EYE_CAPTURE, &in, sizeof(in),
-			    &out, sizeof(out));
-	if (ret)
-		return ret;
-
-	*num_phases = out.num_phases;
-
-	for(i = 0; i < out.num_phases; i++)
-		ber_data[i] = le64toh(out.ber_data[i]) / 281474976710656.;
-
-	return ret;
+	if (GEN_OPS(dev) && GEN_OPS(dev)->diag_eye_read)
+		return GEN_OPS(dev)->diag_eye_read(dev, lane_id, bin, num_phases, ber_data);
+	errno = ENOTSUP;
+	return -1;
 }
 
 /**
@@ -285,78 +181,14 @@ int switchtec_diag_eye_start(struct switchtec_dev *dev, int lane_mask[4],
 			     int intleav_sel, int hstep, int data_mode, 
 			     int eye_mode, uint64_t refclk, int vstep)
 {
-	int err, ret;
-	if (switchtec_is_gen5(dev)) {
-		struct switchtec_gen5_diag_eye_run_in in = {
-			.sub_cmd = MRPC_EYE_CAP_RUN_GEN5,
-			.capture_depth = capture_depth,
-			.timeout_disable = 1,
-			.lane_mask[0] = lane_mask[0],
-			.lane_mask[1] = lane_mask[1],
-			.lane_mask[2] = lane_mask[2],
-			.lane_mask[3] = lane_mask[3],
-		};
-
-		ret = switchtec_diag_eye_cmd_gen5(dev, &in, sizeof(in));
-		err = errno;
-		errno = err;
-		return ret;
-	} else if (switchtec_is_gen6(dev)) {
-		struct switchtec_gen6_diag_eye_run_in in = {
-			.sub_cmd = MRPC_EYE_CAP_RUN_GEN6,
-			.timeout_disable = 1,
-			.lane_mask[0] = lane_mask[0],
-			.lane_mask[1] = lane_mask[1],
-			.lane_mask[2] = lane_mask[2],
-			.lane_mask[3] = lane_mask[3],
-			.sar_sel = sar_sel,
-			.intleav_sel = intleav_sel,
-			.vstep = vstep,
-			.data_mode = data_mode,
-			.eye_mode = eye_mode,
-			.ref_timer_lwr = refclk & 0xFFFFFFFF,
-			.ref_timer_upp = refclk >> 32,
-		};
-
-		ret = switchtec_diag_eye_cmd_gen5(dev, &in, sizeof(in));
-		err = errno;
-		errno = err;
-		return ret;
-	} else {
-		struct switchtec_diag_port_eye_start in = {
-			.sub_cmd = MRPC_EYE_OBSERVE_START,
-			.lane_mask[0] = lane_mask[0],
-			.lane_mask[1] = lane_mask[1],
-			.lane_mask[2] = lane_mask[2],
-			.lane_mask[3] = lane_mask[3],
-			.x_start = x_range->start,
-			.y_start = y_range->start,
-			.x_end = x_range->end,
-			.y_end = y_range->end,
-			.x_step = x_range->step,
-			.y_step = y_range->step,
-			.step_interval = step_interval,
-		};
-
-		ret = switchtec_diag_eye_cmd_gen4(dev, &in, sizeof(in));
-		/* Add delay so hardware has enough time to start */
-		err = errno;
-		usleep(200000);
-		errno = err;
-		return ret;
-	}
+	if (GEN_OPS(dev) && GEN_OPS(dev)->diag_eye_start)
+		return GEN_OPS(dev)->diag_eye_start(dev, lane_mask, x_range, 
+						y_range, step_interval, 
+						capture_depth, sar_sel, 
+						intleav_sel, hstep, data_mode, 
+						eye_mode, refclk, vstep);
+	errno = ENOTSUP;
 	return -1;
-}
-
-static uint64_t hi_lo_to_uint64(uint32_t lo, uint32_t hi)
-{
-	uint64_t ret;
-
-	ret = le32toh(hi);
-	ret <<= 32;
-	ret |= le32toh(lo);
-
-	return ret;
 }
 
 /**
@@ -375,55 +207,10 @@ static uint64_t hi_lo_to_uint64(uint32_t lo, uint32_t hi)
 int switchtec_diag_eye_fetch(struct switchtec_dev *dev, double *pixels,
 			     size_t pixel_cnt, int *lane_id)
 {
-	struct switchtec_diag_port_eye_cmd in = {
-		.sub_cmd = MRPC_EYE_OBSERVE_FETCH,
-	};
-	struct switchtec_diag_port_eye_fetch out;
-	uint64_t samples, errors;
-	int i, ret, data_count;
-
-retry:
-	ret = switchtec_cmd(dev, MRPC_EYE_OBSERVE, &in, sizeof(in), &out,
-			    sizeof(out));
-	if (ret)
-		return ret;
-
-	if (out.status == 1) {
-		usleep(5000);
-		goto retry;
-	}
-
-	ret = switchtec_diag_eye_status(out.status);
-	if (ret)
-		return ret;
-
-	for (i = 0; i < 4; i++) {
-		*lane_id = ffs(out.lane_mask[i]);
-		if (*lane_id)
-			break;
-	}
-
-	data_count = out.data_count_lo | ((int)out.data_count_hi << 8);
-
-	for (i = 0; i < data_count && i < pixel_cnt; i++) {
-		switch (out.data_mode) {
-		case SWITCHTEC_DIAG_EYE_RAW:
-			errors = hi_lo_to_uint64(out.raw[i].error_cnt_lo,
-						 out.raw[i].error_cnt_hi);
-			samples = hi_lo_to_uint64(out.raw[i].sample_cnt_lo,
-						  out.raw[i].sample_cnt_hi);
-			if (samples)
-				pixels[i] = (double)errors / samples;
-			else
-				pixels[i] = nan("");
-			break;
-		case SWITCHTEC_DIAG_EYE_RATIO:
-			pixels[i] = le32toh(out.ratio[i].ratio) / 65536.;
-			break;
-		}
-	}
-
-	return data_count;
+	if (GEN_OPS(dev) && GEN_OPS(dev)->diag_eye_fetch)
+		return GEN_OPS(dev)->diag_eye_fetch(dev, pixels, pixel_cnt, lane_id);
+	errno = ENOTSUP;
+	return -1;
 }
 
 /**
@@ -434,20 +221,10 @@ retry:
  */
 int switchtec_diag_eye_cancel(struct switchtec_dev *dev)
 {
-	int ret;
-	int err;
-	struct switchtec_diag_port_eye_cmd in = {
-		.sub_cmd = MRPC_EYE_OBSERVE_CANCEL,
-	};
-
-	ret = switchtec_diag_eye_cmd_gen4(dev, &in, sizeof(in));
-
-	/* Add delay so hardware can stop completely */
-	err = errno;
-	usleep(200000);
-	errno = err;
-
-	return ret;
+	if (GEN_OPS(dev) && GEN_OPS(dev)->diag_eye_cancel)
+		return GEN_OPS(dev)->diag_eye_cancel(dev);
+	errno = ENOTSUP;
+	return -1;
 }
 
 /**

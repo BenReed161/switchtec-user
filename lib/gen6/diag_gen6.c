@@ -25,8 +25,20 @@
 #include "../switchtec_priv.h"
 #include "switchtec/diag.h"
 #include "switchtec/switchtec.h"
-#include <stdint.h>
+#include "switchtec/endian.h"
+#include "switchtec/utils.h"
 
+#include <stdint.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <string.h>
+#include <strings.h>
+#include <unistd.h>
+
+extern int switchtec_diag_eye_cmd_gen5(struct switchtec_dev *dev, void *in,
+				       size_t size);
 
 static void switchtec_diag_ltssm_set_log_data_gen6(struct switchtec_diag_ltssm_log
 					*log_data,
@@ -191,5 +203,34 @@ int switchtec_diag_ltssm_log_gen6(struct switchtec_dev *dev,
 	ret = switchtec_cmd(dev, MRPC_DIAG_PORT_LTSSM_LOG, &ltssm_freeze,
 			    sizeof(ltssm_freeze), NULL, 0);
 
+	return ret;
+}
+
+int switchtec_diag_eye_start_gen6(struct switchtec_dev *dev, int lane_mask[4],
+				struct range *x_range, struct range *y_range,
+				int step_interval, int capture_depth, int sar_sel,
+				int intleav_sel, int hstep, int data_mode, 
+				int eye_mode, uint64_t refclk, int vstep)
+{
+	int ret, err;
+	struct switchtec_gen6_diag_eye_run_in in = {
+		.sub_cmd = MRPC_EYE_CAP_RUN_GEN6,
+		.timeout_disable = 1,
+		.lane_mask[0] = lane_mask[0],
+		.lane_mask[1] = lane_mask[1],
+		.lane_mask[2] = lane_mask[2],
+		.lane_mask[3] = lane_mask[3],
+		.sar_sel = sar_sel,
+		.intleav_sel = intleav_sel,
+		.vstep = vstep,
+		.data_mode = data_mode,
+		.eye_mode = eye_mode,
+		.ref_timer_lwr = refclk & 0xFFFFFFFF,
+		.ref_timer_upp = refclk >> 32,
+	};
+
+	ret = switchtec_diag_eye_cmd_gen5(dev, &in, sizeof(in));
+	err = errno;
+	errno = err;
 	return ret;
 }

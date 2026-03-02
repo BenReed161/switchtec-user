@@ -77,6 +77,7 @@ const struct switchtec_gen_ops switchtec_gen3_ops = {
 	.diag_eye_start = NULL,
 	.diag_eye_fetch = NULL,
 	.diag_eye_cancel = NULL,
+	.diag_eye_read = NULL,
 	.diag_loopback_set = switchtec_diag_loopback_set_gen4,
 	.diag_loopback_get = switchtec_diag_loopback_get_gen4,
 	.diag_pattern_gen_set = NULL,

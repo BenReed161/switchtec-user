@@ -44,6 +44,11 @@ extern int switchtec_diag_loopback_get_gen5(struct switchtec_dev *dev,
 					    int port_id, int *enabled,
 					    int *ltssm_speed);
 
+extern int switchtec_diag_eye_start_gen6(struct switchtec_dev *dev, int lane_mask[4],
+					void *x_range, void *y_range,
+					int step_interval, int capture_depth, int sar_sel,
+					int intleav_sel, int hstep, int data_mode,
+					int eye_mode, uint64_t refclk, int vstep);
 /**
  * @brief Gen6-specific operations vtable
  */
@@ -53,9 +58,10 @@ const struct switchtec_gen_ops switchtec_gen6_ops = {
 	.diag_cross_hair_disable = NULL,
 	.diag_cross_hair_get = NULL,
 	.diag_eye_set_mode = NULL,
-	.diag_eye_start = NULL,
+	.diag_eye_start = switchtec_diag_eye_start_gen6,
 	.diag_eye_fetch = NULL,
 	.diag_eye_cancel = NULL,
+	.diag_eye_read = NULL,
 	.diag_loopback_set = switchtec_diag_loopback_set_gen5,
 	.diag_loopback_get = switchtec_diag_loopback_get_gen5,
 	.diag_pattern_gen_set = NULL,

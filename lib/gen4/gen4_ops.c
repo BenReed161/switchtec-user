@@ -56,6 +56,17 @@ extern int switchtec_diag_loopback_get_gen4(struct switchtec_dev *dev,
 					    int port_id, int *enabled,
 					    int *ltssm_speed);
 
+extern int switchtec_diag_eye_cancel_gen4(struct switchtec_dev *dev);
+
+extern int switchtec_diag_eye_set_mode_gen4(struct switchtec_dev *dev, int mode);
+
+extern int switchtec_diag_eye_fetch_gen4(struct switchtec_dev *dev, double *pixels,
+					size_t pixel_cnt, int *lane_id);
+extern int switchtec_diag_eye_start_gen4(struct switchtec_dev *dev, int lane_mask[4],
+					void *x_range, void *y_range,
+					int step_interval, int capture_depth, int sar_sel,
+					int intleav_sel, int hstep, int data_mode, 
+					int eye_mode, uint64_t refclk, int vstep);					 
 /**
  * @brief Gen4-specific operations vtable
  */
@@ -64,10 +75,11 @@ const struct switchtec_gen_ops switchtec_gen4_ops = {
 	.diag_cross_hair_enable = NULL,
 	.diag_cross_hair_disable = NULL,
 	.diag_cross_hair_get = NULL,
-	.diag_eye_set_mode = NULL,
-	.diag_eye_start = NULL,
-	.diag_eye_fetch = NULL,
-	.diag_eye_cancel = NULL,
+	.diag_eye_set_mode = switchtec_diag_eye_set_mode_gen4,
+	.diag_eye_start = switchtec_diag_eye_start_gen4,
+	.diag_eye_fetch = switchtec_diag_eye_fetch_gen4,
+	.diag_eye_cancel = switchtec_diag_eye_cancel_gen4,
+	.diag_eye_read = NULL,
 	.diag_loopback_set = switchtec_diag_loopback_set_gen4,
 	.diag_loopback_get = switchtec_diag_loopback_get_gen4,
 	.diag_pattern_gen_set = NULL,
