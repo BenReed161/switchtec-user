@@ -52,13 +52,10 @@
  */
 int switchtec_diag_cross_hair_enable(struct switchtec_dev *dev, int lane_id)
 {
-	struct switchtec_diag_cross_hair_in in = {
-		.sub_cmd = MRPC_CROSS_HAIR_ENABLE,
-		.lane_id = lane_id,
-		.all_lanes = lane_id == SWITCHTEC_DIAG_CROSS_HAIR_ALL_LANES,
-	};
-
-	return switchtec_cmd(dev, MRPC_CROSS_HAIR, &in, sizeof(in), NULL, 0);
+	if (GEN_OPS(dev) && GEN_OPS(dev)->diag_cross_hair_enable)
+		return GEN_OPS(dev)->diag_cross_hair_enable(dev, lane_id);
+	errno = ENOTSUP;
+	return -1;
 }
 
 /**
@@ -69,15 +66,14 @@ int switchtec_diag_cross_hair_enable(struct switchtec_dev *dev, int lane_id)
  */
 int switchtec_diag_cross_hair_disable(struct switchtec_dev *dev)
 {
-	struct switchtec_diag_cross_hair_in in = {
-		.sub_cmd = MRPC_CROSS_HAIR_DISABLE,
-	};
-
-	return switchtec_cmd(dev, MRPC_CROSS_HAIR, &in, sizeof(in), NULL, 0);
+	if (GEN_OPS(dev) && GEN_OPS(dev)->diag_cross_hair_disable)
+		return GEN_OPS(dev)->diag_cross_hair_disable(dev);
+	errno = ENOTSUP;
+	return -1;
 }
 
 /**
- * @brief Disable active cross hair
+ * @brief Get cross hair data
  * @param[in]  dev		Switchtec device handle
  * @param[in]  start_lane_id	Start lane ID to get
  * @param[in]  num_lanes	Number of lanes to get
@@ -88,44 +84,11 @@ int switchtec_diag_cross_hair_disable(struct switchtec_dev *dev)
 int switchtec_diag_cross_hair_get(struct switchtec_dev *dev, int start_lane_id,
 		int num_lanes, struct switchtec_diag_cross_hair *res)
 {
-	struct switchtec_diag_cross_hair_in in = {
-		.sub_cmd = MRPC_CROSS_HAIR_GET,
-		.lane_id = start_lane_id,
-		.num_lanes = num_lanes,
-	};
-	struct switchtec_diag_cross_hair_get out[num_lanes];
-	int i, ret;
-
-	ret = switchtec_cmd(dev, MRPC_CROSS_HAIR, &in, sizeof(in), &out,
-			    sizeof(out));
-	if (ret)
-		return ret;
-
-	for (i = 0; i < num_lanes; i++) {
-		memset(&res[i], 0, sizeof(res[i]));
-		res[i].state = out[i].state;
-		res[i].lane_id = out[i].lane_id;
-
-		if (out[i].state <= SWITCHTEC_DIAG_CROSS_HAIR_WAITING) {
-			continue;
-		} else if (out[i].state < SWITCHTEC_DIAG_CROSS_HAIR_DONE) {
-			res[i].x_pos = out[i].x_pos;
-			res[i].y_pos = out[i].y_pos;
-		} else if (out[i].state == SWITCHTEC_DIAG_CROSS_HAIR_DONE) {
-			res[i].eye_left_lim = out[i].eye_left_lim;
-			res[i].eye_right_lim = out[i].eye_right_lim;
-			res[i].eye_bot_left_lim = out[i].eye_bot_left_lim;
-			res[i].eye_bot_right_lim = out[i].eye_bot_right_lim;
-			res[i].eye_top_left_lim = out[i].eye_top_left_lim;
-			res[i].eye_top_right_lim = out[i].eye_top_right_lim;
-		} else if (out[i].state == SWITCHTEC_DIAG_CROSS_HAIR_ERROR) {
-			res[i].x_pos = out[i].x_pos;
-			res[i].y_pos = out[i].y_pos;
-			res[i].prev_state = out[i].prev_state;
-		}
-	}
-
-	return 0;
+	if (GEN_OPS(dev) && GEN_OPS(dev)->diag_cross_hair_get)
+		return GEN_OPS(dev)->diag_cross_hair_get(dev, start_lane_id,
+							 num_lanes, res);
+	errno = ENOTSUP;
+	return -1;
 }
 
 /**

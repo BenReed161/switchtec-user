@@ -591,3 +591,69 @@ int switchtec_diag_eye_set_mode_gen4(struct switchtec_dev *dev, enum switchtec_d
 
 	return switchtec_diag_eye_cmd_gen4(dev, &in, sizeof(in));
 }
+
+int switchtec_diag_cross_hair_enable_gen4(struct switchtec_dev *dev,
+					  int lane_id)
+{
+	struct switchtec_diag_cross_hair_in in = {
+		.sub_cmd = MRPC_CROSS_HAIR_ENABLE,
+		.lane_id = lane_id,
+		.all_lanes = lane_id == SWITCHTEC_DIAG_CROSS_HAIR_ALL_LANES,
+	};
+
+	return switchtec_cmd(dev, MRPC_CROSS_HAIR, &in, sizeof(in), NULL, 0);
+}
+
+int switchtec_diag_cross_hair_disable_gen4(struct switchtec_dev *dev)
+{
+	struct switchtec_diag_cross_hair_in in = {
+		.sub_cmd = MRPC_CROSS_HAIR_DISABLE,
+	};
+
+	return switchtec_cmd(dev, MRPC_CROSS_HAIR, &in, sizeof(in), NULL, 0);
+}
+
+int switchtec_diag_cross_hair_get_gen4(struct switchtec_dev *dev,
+				       int start_lane_id, int num_lanes,
+				       void *res)
+{
+	struct switchtec_diag_cross_hair *result = res;
+	struct switchtec_diag_cross_hair_in in = {
+		.sub_cmd = MRPC_CROSS_HAIR_GET,
+		.lane_id = start_lane_id,
+		.num_lanes = num_lanes,
+	};
+	struct switchtec_diag_cross_hair_get out[num_lanes];
+	int i, ret;
+
+	ret = switchtec_cmd(dev, MRPC_CROSS_HAIR, &in, sizeof(in), &out,
+			    sizeof(out));
+	if (ret)
+		return ret;
+
+	for (i = 0; i < num_lanes; i++) {
+		memset(&result[i], 0, sizeof(result[i]));
+		result[i].state = out[i].state;
+		result[i].lane_id = out[i].lane_id;
+
+		if (out[i].state <= SWITCHTEC_DIAG_CROSS_HAIR_WAITING) {
+			continue;
+		} else if (out[i].state < SWITCHTEC_DIAG_CROSS_HAIR_DONE) {
+			result[i].x_pos = out[i].x_pos;
+			result[i].y_pos = out[i].y_pos;
+		} else if (out[i].state == SWITCHTEC_DIAG_CROSS_HAIR_DONE) {
+			result[i].eye_left_lim = out[i].eye_left_lim;
+			result[i].eye_right_lim = out[i].eye_right_lim;
+			result[i].eye_bot_left_lim = out[i].eye_bot_left_lim;
+			result[i].eye_bot_right_lim = out[i].eye_bot_right_lim;
+			result[i].eye_top_left_lim = out[i].eye_top_left_lim;
+			result[i].eye_top_right_lim = out[i].eye_top_right_lim;
+		} else if (out[i].state == SWITCHTEC_DIAG_CROSS_HAIR_ERROR) {
+			result[i].x_pos = out[i].x_pos;
+			result[i].y_pos = out[i].y_pos;
+			result[i].prev_state = out[i].prev_state;
+		}
+	}
+
+	return 0;
+}

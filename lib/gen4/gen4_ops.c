@@ -65,16 +65,25 @@ extern int switchtec_diag_eye_fetch_gen4(struct switchtec_dev *dev, double *pixe
 extern int switchtec_diag_eye_start_gen4(struct switchtec_dev *dev, int lane_mask[4],
 					void *x_range, void *y_range,
 					int step_interval, int capture_depth, int sar_sel,
-					int intleav_sel, int hstep, int data_mode, 
-					int eye_mode, uint64_t refclk, int vstep);					 
+					int intleav_sel, int hstep, int data_mode,
+					int eye_mode, uint64_t refclk, int vstep);
+
+extern int switchtec_diag_cross_hair_enable_gen4(struct switchtec_dev *dev,
+						 int lane_id);
+
+extern int switchtec_diag_cross_hair_disable_gen4(struct switchtec_dev *dev);
+
+extern int switchtec_diag_cross_hair_get_gen4(struct switchtec_dev *dev,
+					      int start_lane_id, int num_lanes,
+					      void *res);
 /**
  * @brief Gen4-specific operations vtable
  */
 const struct switchtec_gen_ops switchtec_gen4_ops = {
 	/* Diagnostics - NULL means use common implementation or not supported */
-	.diag_cross_hair_enable = NULL,
-	.diag_cross_hair_disable = NULL,
-	.diag_cross_hair_get = NULL,
+	.diag_cross_hair_enable = switchtec_diag_cross_hair_enable_gen4,
+	.diag_cross_hair_disable = switchtec_diag_cross_hair_disable_gen4,
+	.diag_cross_hair_get = switchtec_diag_cross_hair_get_gen4,
 	.diag_eye_set_mode = switchtec_diag_eye_set_mode_gen4,
 	.diag_eye_start = switchtec_diag_eye_start_gen4,
 	.diag_eye_fetch = switchtec_diag_eye_fetch_gen4,

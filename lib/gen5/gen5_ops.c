@@ -64,14 +64,24 @@ extern int switchtec_diag_eye_start_gen5(struct switchtec_dev *dev, int lane_mas
 					int step_interval, int capture_depth, int sar_sel,
 					int intleav_sel, int hstep, int data_mode,
 					int eye_mode, uint64_t refclk, int vstep);
+
+/* Gen5 shares crosshair implementation with Gen4 */
+extern int switchtec_diag_cross_hair_enable_gen4(struct switchtec_dev *dev,
+						 int lane_id);
+
+extern int switchtec_diag_cross_hair_disable_gen4(struct switchtec_dev *dev);
+
+extern int switchtec_diag_cross_hair_get_gen4(struct switchtec_dev *dev,
+					      int start_lane_id, int num_lanes,
+					      void *res);
 /**
  * @brief Gen5-specific operations vtable
  */
 const struct switchtec_gen_ops switchtec_gen5_ops = {
 	/* Diagnostics - NULL means use common implementation or not supported */
-	.diag_cross_hair_enable = NULL,
-	.diag_cross_hair_disable = NULL,
-	.diag_cross_hair_get = NULL,
+	.diag_cross_hair_enable = switchtec_diag_cross_hair_enable_gen4,
+	.diag_cross_hair_disable = switchtec_diag_cross_hair_disable_gen4,
+	.diag_cross_hair_get = switchtec_diag_cross_hair_get_gen4,
 	.diag_eye_set_mode = NULL,
 	.diag_eye_start = switchtec_diag_eye_start_gen5,
 	.diag_eye_fetch = NULL,
