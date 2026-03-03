@@ -22,24 +22,34 @@
  *
  */
 
-/**
- * @file
- * @brief Generation-specific operations registration
- */
+#ifndef LIBSWITCHTEC_DIAG_GEN6_H
+#define LIBSWITCHTEC_DIAG_GEN6_H
 
-#include "switchtec_priv.h"
-#include "gen_ops.h"
+#include "../switchtec_priv.h"
 
-/**
- * @brief Generation ops table indexed by switchtec_gen enum
- *
- * This table allows O(1) lookup of generation-specific operations
- * based on the device's generation.
- */
-const struct switchtec_gen_ops *switchtec_gen_ops[] = {
-	[SWITCHTEC_GEN_UNKNOWN] = NULL,
-	[SWITCHTEC_GEN3] = &switchtec_gen3_ops,
-	[SWITCHTEC_GEN4] = &switchtec_gen4_ops,
-	[SWITCHTEC_GEN5] = &switchtec_gen5_ops,
-	[SWITCHTEC_GEN6] = &switchtec_gen6_ops,
-};
+int switchtec_diag_ltssm_log_gen6(struct switchtec_dev *dev,
+				 int port, int *log_count, void *log_data);
+
+int switchtec_diag_eye_start_gen6(struct switchtec_dev *dev, int lane_mask[4],
+				  void *x_range, void *y_range,
+				  int step_interval, int capture_depth,
+				  int sar_sel, int intleav_sel, int hstep,
+				  int data_mode, int eye_mode,
+				  uint64_t refclk, int vstep);
+
+int switchtec_diag_pattern_gen_set_gen6(struct switchtec_dev *dev,
+					int port_id, int type,
+					int link_speed);
+
+int switchtec_diag_pattern_gen_get_gen6(struct switchtec_dev *dev,
+					int port_id, int *type);
+
+int switchtec_diag_pattern_mon_set_gen6(struct switchtec_dev *dev,
+					int port_id, int type);
+
+int switchtec_diag_pattern_mon_get_gen6(struct switchtec_dev *dev,
+					int port_id, int lane_id,
+					int *type,
+					unsigned long long *err_cnt);
+
+#endif
