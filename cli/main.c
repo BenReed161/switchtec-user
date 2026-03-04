@@ -197,9 +197,30 @@ static int print_dev_info(struct switchtec_dev *dev)
 
 	device_id = switchtec_device_id(dev);
 
-	ret = switchtec_get_fw_version(dev, version, sizeof(version));
-	if (ret < 0)
-		strcpy(version, "N/A");
+	if (switchtec_boot_phase(dev) == SWITCHTEC_BOOT_PHASE_BL2 && switchtec_is_gen6(dev)) {
+		struct metadata_gen6 {
+			uint32_t header[9];
+			uint32_t version;
+			uint32_t body[12];
+		};
+		struct switchtec_fw_image_info *inf;
+		struct switchtec_fw_image_info *head;
+		inf = switchtec_fw_part_data_bl2(dev);
+		head = inf;
+		for (int i = 0; i <= 8; i++)
+			inf = inf->next;
+		struct metadata_gen6 *data = (struct metadata_gen6 *)inf->metadata;
+		if (data->version)
+			sprintf(version, "0%0x", data->version);
+		else
+			strcpy(version, "N/A");
+		inf = head;
+		switchtec_fw_image_info_free(inf);
+	} else {
+		ret = switchtec_get_fw_version(dev, version, sizeof(version));
+		if (ret < 0)
+			strcpy(version, "N/A");
+	}
 
 	ret = switchtec_get_device_info(dev, &phase, NULL, &hw_rev);
 	if (ret) {
