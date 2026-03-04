@@ -511,7 +511,7 @@ static int info(int argc, char **argv)
 		printf("Secure Unlock Version: \t\t\t0x%08x\n", sn_info.ver_sec_unlock);
 	}
 
-	if (!switchtec_is_gen6(cfg.dev) && phase_id == SWITCHTEC_BOOT_PHASE_BL2) {
+	if (switchtec_is_gen6(cfg.dev) && phase_id == SWITCHTEC_BOOT_PHASE_BL2) {
 		printf("\nOther secure settings are only shown in the BL1 or Main Firmware phase.\n\n");
 		return 0;
 	}
