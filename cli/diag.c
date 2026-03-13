@@ -2803,6 +2803,113 @@ static int linkerr_inject(int argc, char ** argv)
 	return ret;
 }
 
+char *fber_status_string[] = {
+	"Capture has not started",
+	"Capture is running",
+	"Capture has completed",
+	"Counter saturated",
+	"Capture error"
+};
+
+#define CMD_DESC_FBER "Retrieve Pre-FEC and Post-FEC BER values for a port"
+
+static int fber(int argc, char **argv)
+{
+	int ret = 0;
+	uint8_t status;
+	struct switchtec_fber_read_out read_output;
+
+	static struct {
+		struct switchtec_dev *dev;
+		int port_id;
+		int run;
+		int read;
+		int duration;
+		int status;
+	} cfg = {
+		.port_id = -1,
+	};
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		PORT_OPTION,
+		{"run", 'R', "", CFG_NONE, &cfg.run, no_argument,
+		 "run FBER measurement"},
+		{"read", 'r', "", CFG_NONE, &cfg.read, no_argument,
+		 "read FBER results"},
+		{"status", 's', "", CFG_NONE, &cfg.status, no_argument,
+		 "get FBER status"},
+		{"duration", 'd', "", CFG_INT, &cfg.duration, required_argument,
+		 "Test duration in seconds of the FBER run"},
+		{NULL}};
+
+	argconfig_parse(argc, argv, CMD_DESC_FBER, opts, &cfg,
+			sizeof(cfg));
+
+	if (!switchtec_is_gen6(cfg.dev)) {
+		fprintf(stderr, "FBER command is only supported on Gen6.\n");
+		return -1;	
+	}
+
+	if (cfg.port_id == -1) {
+		fprintf(stderr, "Physical port ID must be specified\n");
+		return -1;
+	}
+
+	/* Validate that exactly one operation is specified */
+	int operations_count = cfg.run + cfg.read;
+	if (operations_count > 1) {
+		fprintf(stderr, "Cannot specify more than one operation at a time\n");
+		return -1;
+	}
+
+	if (cfg.run && !cfg.duration) {
+		fprintf(stderr, "Duration must be set for the FBER run\n");
+		return -1;
+	}
+
+	if (cfg.status && cfg.duration) {
+		fprintf(stderr, "Duration cannot be set for the FBER status check\n");
+		return -1;
+	}
+
+	if (cfg.run) {
+		ret = switchtec_diag_fber_run(cfg.dev, cfg.port_id, cfg.duration);
+		if (ret)
+			return ret;
+	} else if (cfg.read) {
+		ret = switchtec_diag_fber_read(cfg.dev, cfg.port_id, &read_output);
+		if (ret)
+			return ret;
+		printf("FBER read results (Port %d):\n", cfg.port_id);
+		printf("FBER status:\t\t\t%u (%s)\n", read_output.status, 
+			fber_status_string[read_output.status]);
+		printf("Pre FEC BER:\t\t\t%lu\n", read_output.pre_fec_ber);
+		printf("Post FEC BER:\t\t\t%lu\n", read_output.post_fec_ber);
+		printf("FLITs received:\t\t\t%lu\n", read_output.flit_counter);
+		printf("Invalid FLITs received:\t\t%lu\n", read_output.inv_flit_counter);
+		printf("Number of FEC-correctable bit errors per FLIT (up to 24):\n");
+		printf("Lane\t\tBit Errors\n");
+		for (int i = 0; i < SWITCHTEC_LANES_PER_STACK; i++)
+			printf("[%d]\t\t%lu\n", i, read_output.lane_counters[i]);
+		
+		printf("For all lanes:\t%lu\n", read_output.corr_bit_error_cnt_all_lanes);
+	} else if (cfg.status) {
+		ret = switchtec_diag_fber_status(cfg.dev, cfg.port_id, &status);
+		if (ret)
+			return ret;
+		if (status < 5) {
+			printf("FBER status %d (%s)\n", status, fber_status_string[status]);
+		} else {
+			printf("FBER status %d (Unknown)\n", status);
+		}
+	} else {
+		fprintf(stderr, "FBER operation must be specified either --run, --read or --status\n");
+		return -1;
+	}
+
+	return 0;
+}
+
 static int stack_id_check(struct switchtec_dev *dev, int stack_id)
 {
 	if (switchtec_is_gen6(dev)) {
@@ -3366,6 +3473,7 @@ static int osa_dump_data(int argc, char **argv)
 static const struct cmd commands[] = {
 	CMD(crosshair,		CMD_DESC_CROSS_HAIR),
 	CMD(eye,		CMD_DESC_EYE),
+	CMD(fber,		CMD_DESC_FBER),
 	CMD(list_mrpc,		CMD_DESC_LIST_MRPC),
 	CMD(loopback,		CMD_DESC_LOOPBACK),
 	CMD(pattern,		CMD_DESC_PATTERN),

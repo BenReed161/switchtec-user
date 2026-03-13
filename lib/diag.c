@@ -2697,4 +2697,63 @@ int switchtec_osa(struct switchtec_dev *dev, int stack_id, int operation)
 	return ret;
 }
 
+int switchtec_diag_fber_run(struct switchtec_dev *dev, int port_id, int test_duration)
+{
+	int ret = 0;
+	struct {
+		uint8_t subcmd;
+		uint8_t port_id;
+		uint16_t reserved;
+		uint32_t duration;
+	} switchtec_fber_in;
+
+	switchtec_fber_in.duration = test_duration;
+	switchtec_fber_in.port_id = port_id;
+	switchtec_fber_in.subcmd = MRPC_FBER_RUN;
+	ret = switchtec_cmd(dev, MRPC_FBER, &switchtec_fber_in, 
+			    sizeof(switchtec_fber_in), NULL, 0);
+	if (ret) {
+		switchtec_perror("FBER Run");
+	}
+	return ret;
+}
+
+int switchtec_diag_fber_status(struct switchtec_dev *dev, int port_id, uint8_t *status)
+{
+	int ret = 0;
+	struct {
+		uint8_t subcmd;
+		uint8_t port_id;
+		uint16_t reserved;
+	} switchtec_fber_in;
+
+	switchtec_fber_in.port_id = port_id;
+	switchtec_fber_in.subcmd = MRPC_FBER_STATUS;
+	ret = switchtec_cmd(dev, MRPC_FBER, &switchtec_fber_in,
+			    sizeof(switchtec_fber_in), status, sizeof(*status));
+	if (ret) {
+		switchtec_perror("FBER Status");
+	}
+	return ret;
+}
+
+int switchtec_diag_fber_read(struct switchtec_dev *dev, int port_id, struct switchtec_fber_read_out *output)
+{
+	int ret = 0;
+	struct {
+		uint8_t subcmd;
+		uint8_t port_id;
+		uint16_t reserved;
+	} switchtec_fber_in;
+
+	switchtec_fber_in.port_id = port_id;
+	switchtec_fber_in.subcmd = MRPC_FBER_READ;
+	ret = switchtec_cmd(dev, MRPC_FBER, &switchtec_fber_in, 
+			    sizeof(switchtec_fber_in), output, sizeof(struct switchtec_fber_read_out));
+	if (ret) {
+		switchtec_perror("FBER Read");
+	}
+	return ret;
+}
+
 /**@}*/

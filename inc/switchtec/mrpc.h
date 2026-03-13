@@ -135,9 +135,10 @@ enum mrpc_cmd {
 	MRPC_GEN5_EYE_CAPTURE = 0x142,
 	MRPC_FTDC_LOG_DUMP = 0x147,
 	MRPC_RTC = 0x14C,
+	MRPC_FBER = 0x14D,
 	MRPC_FW_IMG_GET = 0x14F,
 
-	MRPC_MAX_ID = 0x14D,
+	MRPC_MAX_ID = 0x180,
 };
 
 enum mrpc_bg_status {
@@ -358,6 +359,10 @@ enum mrpc_sub_cmd {
 	MRPC_GET_SECURE_OTP = 0,
 	MRPC_GET_SECURE_STATUS = 1,
 	MRPC_GET_SECURE_BOOT_STATUS_PINSTRAP = 2,
+
+	MRPC_FBER_RUN = 0,
+	MRPC_FBER_STATUS = 1,
+	MRPC_FBER_READ = 2,
 };
 
 #endif

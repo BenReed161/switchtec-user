@@ -58,6 +58,7 @@ struct switchtec_dev;
 #define SWITCHTEC_MAX_EVENT_COUNTERS 64
 #define SWITCHTEC_UNBOUND_PORT 255
 #define SWITCHTEC_PFF_PORT_VEP 100
+#define SWITCHTEC_LANES_PER_STACK 16
 
 #define SWITCHTEC_FLASH_BOOT_PART_START 0xa8000000
 #define SWITCHTEC_FLASH_MAP0_PART_START 0xa8020000
@@ -1655,6 +1656,18 @@ struct switchtec_diag_ltssm_log {
 	int rx_minor_state;
 };
 
+struct switchtec_fber_read_out {
+	uint8_t status;
+	uint8_t reserved[3];
+	uint8_t padding[4];
+	uint64_t pre_fec_ber;
+	uint64_t post_fec_ber;
+	uint64_t flit_counter;
+	uint64_t inv_flit_counter;
+	uint64_t corr_bit_error_cnt_all_lanes;
+	uint64_t lane_counters[SWITCHTEC_LANES_PER_STACK];
+};
+
 int switchtec_diag_cross_hair_enable(struct switchtec_dev *dev, int lane_id);
 int switchtec_diag_cross_hair_disable(struct switchtec_dev *dev);
 int switchtec_diag_cross_hair_get(struct switchtec_dev *dev, int start_lane_id,
@@ -1746,6 +1759,11 @@ int switchtec_osa_config_pattern(struct switchtec_dev * dev, int stack_id,
 				 uint32_t * value_data, uint32_t * mask_data);
 int switchtec_osa_capture_data(struct switchtec_dev * dev, int stack_id,
 			       int lane, int direction);
+
+int switchtec_diag_fber_run(struct switchtec_dev *dev, int port_id, int time_duration);
+int switchtec_diag_fber_status(struct switchtec_dev *dev, int port_id, uint8_t *status);
+int switchtec_diag_fber_read(struct switchtec_dev *dev, int port_id, struct switchtec_fber_read_out *output);
+
 #ifdef __cplusplus
 }
 #endif
