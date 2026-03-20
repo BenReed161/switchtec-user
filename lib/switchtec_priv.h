@@ -33,6 +33,10 @@
 #include <limits.h>
 
 struct switchtec_dev;
+struct switchtec_gen6_token;
+struct switchtec_kmsk;
+struct switchtec_security_cfg_state;
+struct switchtec_uds;
 
 /**
  * @brief The types of fw partitions
@@ -196,11 +200,30 @@ struct switchtec_gen_ops {
 			void *signature, void *kmsk);
 	int (*debug_unlock)(struct switchtec_dev *dev, uint32_t serial,
 			    uint32_t ver_sec_unlock, void *public_key,
-			    void *signature);
+			    void *signature, void *token);
 	int (*debug_lock_update)(struct switchtec_dev *dev, uint32_t serial,
 				 uint32_t ver_sec_unlock, void *public_key,
 				 void *signature);
-
+	int (*security_settings_get)(struct switchtec_dev *dev,
+				     struct switchtec_security_cfg_state *state);
+	int (*debug_token_unlock_get_token)(struct switchtec_dev *dev,
+			struct switchtec_gen6_token *token,
+			int token_type);
+	int (*security_state_has_kmsk)(struct switchtec_security_cfg_state *state,
+				  struct switchtec_kmsk *kmsk);
+	int (*read_uds_file)(FILE *uds_file, struct switchtec_uds *uds);
+	int (*read_sec_cfg_file)(struct switchtec_dev *dev, FILE *setting_file,
+				 void *set);
+	int (*read_pubk_file)(FILE *pubk_file, void *pubk);
+	int (*read_kmsk_file)(FILE *kmsk_file, void *kmsk);
+	int (*read_signature_file)(FILE *sig_file, void *signature);
+	int (*read_token_file)(FILE *tkn_file,
+			       struct switchtec_gen6_token *token);
+	int (*dbg_unlock_version_update)(struct switchtec_dev *dev,
+					 uint32_t serial,
+					 uint32_t ver_sec_unlock,
+					 void *public_key,
+					 void *signature);
 	/* Firmware */
 	int (*fw_part_id_to_type)(int part_id);
 	int (*fw_type_to_part_id)(int type);

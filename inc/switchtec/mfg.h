@@ -45,11 +45,11 @@
 #define SWITCHTEC_PSID_DWORD_S 	4
 
 #define OTP_MULTI_DWORD_IMAGE_BIAK0			   656
-#define OTP_DWORD_0							   0
+#define OTP_DWORD_0				0
 #define OTP_DWORD_10 						   10
 
-#define OTP_DWORD_0_PRODUCT_SECSC_LSB          22
-#define OTP_DWORD_0_PRODUCT_SECSC_MSK          0x00400000
+#define OTP_DWORD_0_PRODUCT_SECSC_LSB		22
+#define OTP_DWORD_0_PRODUCT_SECSC_MSK		0x00400000
 
 #define OTP_DWORD_10_SMBUS_SMBRMRPCADDR_LSB    0
 #define OTP_DWORD_10_SMBUS_SMBRMRPCADDR_MSK    0x000003FF
@@ -324,8 +324,6 @@ int switchtec_sn_ver_get(struct switchtec_dev *dev,
 			 struct switchtec_sn_ver_info *info);
 int switchtec_security_config_get(struct switchtec_dev *dev,
 			          struct switchtec_security_cfg_state *state);
-int switchtec_security_spi_avail_rate_get(struct switchtec_dev *dev,
-		struct switchtec_security_spi_avail_rate *rates);
 int switchtec_security_config_set(struct switchtec_dev *dev,
 				  struct switchtec_security_cfg_set *setting);
 int switchtec_mailbox_to_file(struct switchtec_dev *dev, int fd);
@@ -352,7 +350,7 @@ int switchtec_dbg_unlock_version_update(struct switchtec_dev *dev,
 					uint32_t ver_sec_unlock,
 					struct switchtec_pubkey *public_key,
 			 		struct switchtec_signature *signature);
-int switchtec_dbg_unlock_get_token_gen6(struct switchtec_dev *dev,
+int switchtec_dbg_unlock_get_token(struct switchtec_dev *dev,
 					struct switchtec_gen6_token *token,
 					int token_type);
 int switchtec_read_sec_cfg_file(struct switchtec_dev *dev,
@@ -367,7 +365,6 @@ int switchtec_read_uds_file(FILE *uds_file, struct switchtec_uds *uds);
 int
 switchtec_security_state_has_kmsk(struct switchtec_security_cfg_state *state,
 				  struct switchtec_kmsk *kmsk);
-int security_settings_get_gen6(struct switchtec_dev *dev,
-					struct switchtec_security_cfg_state *state);
+int switchtec_security_settings_get(struct switchtec_dev *dev, struct switchtec_security_cfg_state *state);
 
 #endif // LIBSWITCHTEC_MFG_H
