@@ -228,6 +228,34 @@ struct switchtec_gen_ops {
 	int (*fw_part_id_to_type)(int part_id);
 	int (*fw_type_to_part_id)(int type);
 	const char *(*fw_part_id_to_str)(int part_id);
+	int (*fw_img_write_hdr)(int fd, struct switchtec_fw_image_info *info);
+	struct switchtec_fw_part_summary *(*fw_part_summary)(struct switchtec_dev *dev);
+	int (*fw_file_info)(int fd, struct switchtec_fw_image_info *info);
+	int (*get_device_id_bl2)(struct switchtec_dev *dev,
+				 unsigned short *device_id);
+	struct switchtec_fw_image_info *
+	(*fw_part_data_bl2)(struct switchtec_dev *dev);
+	int (*fw_set_redundant_flag)(struct switchtec_dev *dev, int keyman,
+				     int riot, int bl2, int cfg, int fw,
+				     int set);
+	int (*fw_toggle_active_partition)(struct switchtec_dev *dev,
+					  int toggle_bl2, int toggle_key,
+					  int toggle_fw, int toggle_cfg,
+					  int toggle_riotcore);
+	int (*fw_img_get)(struct switchtec_dev *dev, int fd,
+			  enum switchtec_fw_type_gen6 fw_type, int fw_slot,
+			  void (*progress_callback)(int cur, int tot));
+	int (*fw_write_file)(struct switchtec_dev *dev, FILE *fimg,
+			    int dont_activate, int force,
+			    void (*progress_callback)(int cur, int tot));
+	int (*fw_read)(struct switchtec_dev *dev, unsigned long addr, size_t len, void *buf);
+	int (*fw_read_fd)(struct switchtec_dev *dev, int fd, unsigned long addr, 
+			      size_t len, void (*progress_callback)(int cur, int tot));
+	int (*fw_body_read_fd)(struct switchtec_dev *dev, int fd,
+			      struct switchtec_fw_image_info *info,
+			      void (*progress_callback)(int cur, int tot));
+	int (*fw_is_boot_ro) (struct switchtec_dev *dev);
+	int (*fw_set_boot_ro) (struct switchtec_dev *dev, enum switchtec_fw_ro ro);
 };
 
 /* Generation ops table indexed by switchtec_gen enum */
@@ -295,6 +323,14 @@ struct switchtec_ops {
 	ssize_t (*write_from_gas)(struct switchtec_dev *dev, int fd,
 				  const void __gas *src, size_t n);
 };
+
+/* Generation-specific firmware functions - REMOVE THESE EVENTUALLY -> GEN3 use exisitng layout*/
+struct switchtec_fw_part_summary *switchtec_fw_part_summary_gen3(struct switchtec_dev *dev);
+int switchtec_fw_img_write_hdr_gen3(int fd, struct switchtec_fw_image_info *info);
+int switchtec_fw_file_info_gen3(int fd, struct switchtec_fw_image_info *info);
+int switchtec_fw_part_info_gen3(struct switchtec_dev *dev, int nr_info, struct switchtec_fw_image_info *info);
+int switchtec_fw_is_boot_ro_gen3(struct switchtec_dev *dev);
+int switchtec_fw_set_boot_ro_gen3(struct switchtec_dev *dev, enum switchtec_fw_ro ro);
 
 int switchtec_flash_part(struct switchtec_dev *dev,
 			 struct switchtec_fw_image_info *info,

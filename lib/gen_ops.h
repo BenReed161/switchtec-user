@@ -32,6 +32,9 @@
 #include "gen6/mfg_gen6.h"
 #include "gen5/mfg_gen5.h"
 #include "gen4/mfg_gen4.h"
+#include "gen4/fw_gen4.h"
+#include "gen5/fw_gen5.h"
+#include "gen6/fw_gen6.h"
 
 /**
  * @brief Gen6-specific operations vtable
@@ -97,6 +100,20 @@ const struct switchtec_gen_ops switchtec_gen6_ops = {
 	.fw_part_id_to_type = NULL,
 	.fw_type_to_part_id = NULL,
 	.fw_part_id_to_str = NULL,
+	.fw_part_summary = switchtec_fw_part_summary_gen6,
+	.fw_img_write_hdr = switchtec_fw_img_write_hdr_gen6,
+	.fw_file_info = switchtec_fw_file_info_gen5,
+	.get_device_id_bl2 = switchtec_get_device_id_bl2_gen5,
+	.fw_part_data_bl2 = switchtec_fw_part_data_bl2_gen6,
+	.fw_set_redundant_flag = switchtec_fw_set_redundant_flag_gen6,
+	.fw_toggle_active_partition = switchtec_fw_toggle_active_partition_gen6,
+	.fw_img_get = switchtec_fw_img_get_gen6,
+	.fw_write_file = switchtec_fw_write_file_gen4,
+	.fw_read = switchtec_fw_read_gen4,
+	.fw_read_fd = switchtec_fw_read_fd_gen4,
+	.fw_body_read_fd = switchtec_fw_body_read_fd_gen4,
+	.fw_is_boot_ro = NULL,
+	.fw_set_boot_ro = NULL,
 };
 
 /**
@@ -161,6 +178,20 @@ const struct switchtec_gen_ops switchtec_gen5_ops = {
 	.fw_part_id_to_type = NULL,
 	.fw_type_to_part_id = NULL,
 	.fw_part_id_to_str = NULL,
+	.fw_part_summary = switchtec_fw_part_summary_gen5,
+	.fw_img_write_hdr = switchtec_fw_img_write_hdr_gen5,
+	.fw_file_info = switchtec_fw_file_info_gen5,
+	.get_device_id_bl2 = switchtec_get_device_id_bl2_gen5,
+	.fw_part_data_bl2 = NULL, // Not supported on Gen5
+	.fw_set_redundant_flag = switchtec_fw_set_redundant_flag_gen5,
+	.fw_toggle_active_partition = switchtec_fw_toggle_active_partition_gen5,
+	.fw_img_get = NULL, // Not supported on Gen5
+	.fw_write_file = switchtec_fw_write_file_gen4,
+	.fw_read = switchtec_fw_read_gen4,
+	.fw_read_fd = switchtec_fw_read_fd_gen4,
+	.fw_body_read_fd = switchtec_fw_body_read_fd_gen4,
+	.fw_is_boot_ro = NULL,
+	.fw_set_boot_ro = NULL,
 };
 
 /**
@@ -222,11 +253,25 @@ const struct switchtec_gen_ops switchtec_gen4_ops = {
 	.read_kmsk_file = switchtec_read_kmsk_file_gen4,
 	.read_signature_file = switchtec_read_signature_file_gen4,
 	.dbg_unlock_version_update = switchtec_dbg_unlock_version_update_gen4,
-	
+
 	/* Firmware */
 	.fw_part_id_to_type = NULL,
 	.fw_type_to_part_id = NULL,
 	.fw_part_id_to_str = NULL,
+	.fw_part_summary = switchtec_fw_part_summary_gen4,
+	.fw_img_write_hdr = switchtec_fw_img_write_hdr_gen4,
+	.fw_file_info = switchtec_fw_file_info_gen4,
+	.get_device_id_bl2 = switchtec_get_device_id_bl2_gen4,
+	.fw_part_data_bl2 = NULL, // Not supported on Gen4
+	.fw_set_redundant_flag = NULL, // Not supported on Gen4
+	.fw_toggle_active_partition = switchtec_fw_toggle_active_partition_gen4,
+	.fw_img_get = NULL, // Not supported on Gen4
+	.fw_write_file = switchtec_fw_write_file_gen4,
+	.fw_read = switchtec_fw_read_gen4,
+	.fw_read_fd = switchtec_fw_read_fd_gen4,
+	.fw_body_read_fd = switchtec_fw_body_read_fd_gen4,
+	.fw_is_boot_ro = NULL,
+	.fw_set_boot_ro = NULL,
 };
 
 /**
@@ -289,6 +334,12 @@ const struct switchtec_gen_ops switchtec_gen3_ops = {
 	.fw_part_id_to_type = NULL,
 	.fw_type_to_part_id = NULL,
 	.fw_part_id_to_str = NULL,
+	.fw_part_summary = switchtec_fw_part_summary_gen3,
+	.fw_file_info = switchtec_fw_file_info_gen3,
+	.fw_img_write_hdr = switchtec_fw_img_write_hdr_gen3,
+	//.fw_read = switchtec_fw_read_gen3, add later implement gen3 like other gens
+	.fw_is_boot_ro = switchtec_fw_is_boot_ro_gen3,
+	.fw_set_boot_ro = switchtec_fw_set_boot_ro_gen3,
 };
 
 #endif
