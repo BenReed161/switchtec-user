@@ -370,6 +370,23 @@ static void print_security_config_gen6(struct switchtec_security_cfg_state *stat
 			break;
 		}
 	}
+
+	if(state->rom_key_1_disable)
+		printf("MHCP Inbuilt Key0\t\t\tRevoked\n");
+	else
+		printf("MHCP Inbuilt Key0\t\t\tActive\n");
+	if(state->rom_key_2_disable)
+		printf("MHCP Inbuilt Key1\t\t\tRevoked\n");
+	else
+		printf("MHCP Inbuilt Key1\t\t\tActive\n");
+	if(state->rom_key_3_disable)
+		printf("MHCP Inbuilt Key2\t\t\tRevoked\n");
+	else
+		printf("MHCP Inbuilt Key2\t\t\tActive\n");
+	if(state->rom_key_4_disable)
+		printf("MHCP Inbuilt Key3\t\t\tRevoked\n");
+	else
+		printf("MHCP Inbuilt Key3\t\t\tActive\n");
 }
 
 static void print_security_cfg_set(struct switchtec_security_cfg_set *set)

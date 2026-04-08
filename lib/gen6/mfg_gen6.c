@@ -151,6 +151,10 @@ int switchtec_security_config_get_gen6(struct switchtec_dev *dev,
 					(reply.twi_recov_addr & SECURE_CFG_GET_I2C_RCVRY_ADDR_MSK) ? (SECURE_CFG_GET_OCP) : 
 					((reply.twi_recov_info & SECURE_CFG_GET_I2C_RCVRY_INF_MSK) | 
 					(reply.twi_recov_addr & SECURE_CFG_GET_I2C_RCVRY_ADDR_MSK)));
+	state->rom_key_1_disable = (reply.bootrom_key_revoke_reserved >> SECURE_CFG_GET_ROM_KEY_1_LSB) & 0x1;
+	state->rom_key_2_disable = (reply.bootrom_key_revoke_reserved >> SECURE_CFG_GET_ROM_KEY_2_LSB) & 0x1;
+	state->rom_key_3_disable = (reply.bootrom_key_revoke_reserved >> SECURE_CFG_GET_ROM_KEY_3_LSB) & 0x1;
+	state->rom_key_4_disable = (reply.bootrom_key_revoke_reserved >> SECURE_CFG_GET_ROM_KEY_4_LSB) & 0x1;
 	memcpy(state->otp_key_hash, reply.otp_key_hash, 
 		SWITCHTEC_KMSK_NUM_GEN6 * SWITCHTEC_KMSK_LEN);
 
