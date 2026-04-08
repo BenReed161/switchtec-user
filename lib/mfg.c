@@ -456,4 +456,103 @@ int switchtec_sn_ver_get(struct switchtec_dev *dev,
 	return -EOPNOTSUPP;
 }
 
+
+/**
+ * @brief Get device configuration (Gen6 only)
+ * @param[in]  dev     Switchtec device handle
+ * @param[out] config  Device configuration output
+ * @return 0 on success, error code on failure
+ */
+int switchtec_device_config_get(struct switchtec_dev *dev,
+				struct switchtec_device_config_get *config)
+{
+	if (GEN_OPS(dev) && GEN_OPS(dev)->device_config_get)
+		return GEN_OPS(dev)->device_config_get(dev, config);
+	return -EOPNOTSUPP;
+}
+
+/**
+ * @brief Set device settings (Gen6 only)
+ * @param[in] dev       Switchtec device handle
+ * @param[in] settings  Device settings to set
+ * @return 0 on success, error code on failure
+ */
+int switchtec_device_config_set_dev(struct switchtec_dev *dev,
+				    struct switchtec_device_config_dev_settings *settings)
+{
+	if (GEN_OPS(dev) && GEN_OPS(dev)->device_config_set_dev)
+		return GEN_OPS(dev)->device_config_set_dev(dev, settings);
+	return -EOPNOTSUPP;
+}
+
+/**
+ * @brief Set customer settings (Gen6 only)
+ * @param[in] dev       Switchtec device handle
+ * @param[in] settings  Customer settings to set
+ * @return 0 on success, error code on failure
+ */
+int switchtec_device_config_set_customer(struct switchtec_dev *dev,
+					 struct switchtec_device_config_customer_settings *settings)
+{
+	if (GEN_OPS(dev) && GEN_OPS(dev)->device_config_set_customer)
+		return GEN_OPS(dev)->device_config_set_customer(dev, settings);
+	return -EOPNOTSUPP;
+}
+
+/**
+ * @brief Set security settings (Gen6 only)
+ * @param[in] dev       Switchtec device handle
+ * @param[in] settings  Security settings to set
+ * @return 0 on success, error code on failure
+ */
+int switchtec_device_config_set_security(struct switchtec_dev *dev,
+					 struct switchtec_device_config_secure_settings *settings)
+{
+	if (GEN_OPS(dev) && GEN_OPS(dev)->device_config_set_security)
+		return GEN_OPS(dev)->device_config_set_security(dev, settings);
+	return -EOPNOTSUPP;
+}
+
+/**
+ * @brief Send DOK signature for validation (Gen6 only)
+ * @param[in] dev  Switchtec device handle
+ * @param[in] sig  Signature data
+ * @return 0 on success, error code on failure
+ */
+int switchtec_dok_config_signature(struct switchtec_dev *dev,
+				   struct switchtec_dok_signature *sig)
+{
+	if (GEN_OPS(dev) && GEN_OPS(dev)->dok_config_signature)
+		return GEN_OPS(dev)->dok_config_signature(dev, sig);
+	return -EOPNOTSUPP;
+}
+
+/**
+ * @brief Add DOK key entry (Gen6 only)
+ * @param[in] dev      Switchtec device handle
+ * @param[in] key_add  Key add command structure
+ * @return 0 on success, error code on failure
+ */
+int switchtec_dok_config_key_add(struct switchtec_dev *dev,
+				 struct switchtec_dok_key_add *key_add)
+{
+	if (GEN_OPS(dev) && GEN_OPS(dev)->dok_config_key_add)
+		return GEN_OPS(dev)->dok_config_key_add(dev, key_add);
+	return -EOPNOTSUPP;
+}
+
+/**
+ * @brief Revoke DOK key entry (Gen6 only)
+ * @param[in] dev         Switchtec device handle
+ * @param[in] key_revoke  Key revoke command structure
+ * @return 0 on success, error code on failure
+ */
+int switchtec_dok_config_key_revoke(struct switchtec_dev *dev,
+				    struct switchtec_dok_key_revoke *key_revoke)
+{
+	if (GEN_OPS(dev) && GEN_OPS(dev)->dok_config_key_revoke)
+		return GEN_OPS(dev)->dok_config_key_revoke(dev, key_revoke);
+	return -EOPNOTSUPP;
+}
+
 /**@}*/

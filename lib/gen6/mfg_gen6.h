@@ -69,4 +69,18 @@ int switchtec_dbg_unlock_get_token_gen6(struct switchtec_dev *dev, void *token,
 
 int switchtec_read_token_file_gen6(FILE *tkn_file, void *token);
 
+int switchtec_device_config_get_gen6(struct switchtec_dev *dev, void *config);
+
+int switchtec_device_config_set_dev_gen6(struct switchtec_dev *dev, void *settings);
+
+int switchtec_device_config_set_customer_gen6(struct switchtec_dev *dev, void *settings);
+
+int switchtec_device_config_set_security_gen6(struct switchtec_dev *dev, void *settings);
+
+int switchtec_dok_config_signature_gen6(struct switchtec_dev *dev, void *sig);
+
+int switchtec_dok_config_key_add_gen6(struct switchtec_dev *dev, void *key_add);
+
+int switchtec_dok_config_key_revoke_gen6(struct switchtec_dev *dev, void *key_revoke);
+
 #endif

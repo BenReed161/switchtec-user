@@ -225,6 +225,13 @@ struct switchtec_gen_ops {
 					 uint32_t ver_sec_unlock,
 					 void *public_key,
 					 void *signature);
+	int (*device_config_get)(struct switchtec_dev *dev, void *config);
+	int (*device_config_set_dev)(struct switchtec_dev *dev, void *settings);
+	int (*device_config_set_customer)(struct switchtec_dev *dev, void *settings);
+	int (*device_config_set_security)(struct switchtec_dev *dev, void *settings);
+	int (*dok_config_signature)(struct switchtec_dev *dev, void *sig);
+	int (*dok_config_key_add)(struct switchtec_dev *dev, void *key_add);
+	int (*dok_config_key_revoke)(struct switchtec_dev *dev, void *key_revoke);
 	/* Firmware */
 	int (*fw_img_write_hdr)(int fd, struct switchtec_fw_image_info *info);
 	struct switchtec_fw_part_summary *(*fw_part_summary)(struct switchtec_dev *dev);

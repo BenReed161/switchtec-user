@@ -107,6 +107,13 @@ const struct switchtec_gen_ops switchtec_gen6_ops = {
 	.read_pubk_file = switchtec_read_pubk_file_gen4,
 	.read_kmsk_file = switchtec_read_kmsk_file_gen4,
 	.read_signature_file = switchtec_read_signature_file_gen4,
+	.device_config_get = switchtec_device_config_get_gen6,
+	.device_config_set_dev = switchtec_device_config_set_dev_gen6,
+	.device_config_set_customer = switchtec_device_config_set_customer_gen6,
+	.device_config_set_security = switchtec_device_config_set_security_gen6,
+	.dok_config_signature = switchtec_dok_config_signature_gen6,
+	.dok_config_key_add = switchtec_dok_config_key_add_gen6,
+	.dok_config_key_revoke = switchtec_dok_config_key_revoke_gen6,
 
 	/* Firmware */
 	.fw_part_summary = switchtec_fw_part_summary_gen6,

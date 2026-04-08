@@ -75,6 +75,31 @@
 #define SECURE_CFG_GET_ROM_KEY_3_LSB		0x00000005
 #define SECURE_CFG_GET_ROM_KEY_4_LSB		0x00000004
 
+/* Sub-commands for MRPC_DEVICE_CONFIG */
+#define DEVICE_CONFIG_SUB_CMD_SET_DEVICE	0x0
+#define DEVICE_CONFIG_SUB_CMD_SET_SECURITY	0x1
+#define DEVICE_CONFIG_SUB_CMD_SET_CUSTOMER	0x2
+#define DEVICE_CONFIG_SUB_CMD_GET		0x3
+
+/* Constants for device configuration structures */
+#define DEVICE_CONFIG_CUSTOMER_FIELD_NUM	4
+#define DEVICE_CONFIG_CUSTOMER_ECC_FIELD_NUM	4
+#define DEVICE_CONFIG_CUSTOMER_ECC_FIELD_SIZE	2
+#define DEVICE_CONFIG_KEY_HASH_SIZE_DWORDS	16
+#define DEVICE_CONFIG_TOKEN_SIGNALS_SIZE_DWORDS	4
+#define DEVICE_CONFIG_MAX_KEY_SLOTS		12
+
+/* Sub-commands for MRPC_DOK_CONFIG */
+#define DOK_CONFIG_SUB_CMD_SIGNATURE		0x1
+#define DOK_CONFIG_SUB_CMD_KEY_ADD		0x2
+#define DOK_CONFIG_SUB_CMD_KEY_REVOKE		0x3
+
+/* UID/PSID type values */
+#define DOK_UID_PSID_TYPE_NONE			0x0
+#define DOK_UID_PSID_TYPE_UID_ONLY		0x1
+#define DOK_UID_PSID_TYPE_PSID_ONLY		0x2
+#define DOK_UID_PSID_TYPE_UID_AND_PSID		0x3
+
 struct switchtec_sn_ver_info {
 	uint32_t chip_serial;
 	uint32_t ver_km;
@@ -328,6 +353,155 @@ struct sec_cfg_get_struct {
 	uint32_t read_dwords;
 };
 
+/**
+ * @brief Device settings for MRPC_DEVICE_CONFIG
+ */
+struct switchtec_device_config_dev_settings {
+	/* DWORD 0 */
+	uint32_t twi_configuration;
+	/* 
+		TWI OCP address			10 bits 
+		TWI MRPC address		10 bits
+		TWI recovery address type	2 bits
+		TWI recovery bus		2 bits
+		reserved			8 bits
+	*/
+	uint32_t i3c_pid_hi;
+	uint16_t i3c_pid_lo;
+	uint16_t i3c_configuration;
+	/*
+		I3C 7-bit address	7 bits
+		I3C recovery bus	2 bits
+		reserved		7 bits
+	*/
+};
+
+/**
+ * @brief Customer settings for MRPC_DEVICE_CONFIG
+ */
+struct switchtec_device_config_customer_settings {
+	uint32_t psid0[SWITCHTEC_PSID_DWORD_S];
+
+	uint32_t customer_field_status;
+	/* PSID0 status 2 bits*/
+	/**< customer ecc field 0 status */
+	/**< customer ecc field 1 status */
+	/**< customer ecc field 2 status */
+	//uint32_t customer_ecc_field_3_status  :2;   /**< customer ecc field 3 status */
+	//uint32_t rsvd_0                       :22;  /**< reserved */
+
+	uint16_t device_id;
+	uint16_t vendor_id;
+
+	uint16_t revision_id;
+	uint16_t subsystem_id;
+
+	uint16_t subsystem_vendor_id;
+	uint16_t rsvd_1;
+
+	uint32_t customer_fields[DEVICE_CONFIG_CUSTOMER_FIELD_NUM];
+	uint32_t customer_ecc_fields[DEVICE_CONFIG_CUSTOMER_ECC_FIELD_NUM]
+				    [DEVICE_CONFIG_CUSTOMER_ECC_FIELD_SIZE];
+};
+
+/**
+ * @brief Key data entry for security settings
+ */
+struct switchtec_device_config_key_data {
+	/* DWORD 0 */
+	uint8_t index;
+	uint8_t status;
+	uint16_t rsvd;
+
+	/* DWORD 1-16: key hash (SHA2-512) */
+	uint32_t hash[DEVICE_CONFIG_KEY_HASH_SIZE_DWORDS];
+};
+
+/**
+ * @brief Security settings for MRPC_DEVICE_CONFIG
+ */
+struct switchtec_device_config_secure_settings {
+	/* DWORD 0 */
+	uint16_t command_map;
+	uint8_t token_disable_bits;
+	//uint32_t static_token_disable         :1;   /**< static debug token disable */
+	//uint32_t psid_only_token_disable      :1;   /**< PSID only token disable */
+	//uint32_t uid_only_token_disable       :1;   /**< UID only token disable */
+	//uint32_t psid_uid_token_disable       :1;   /**< PSID and UID token disable */
+	//uint32_t rsvd_1                       :4;   /**< reserved */
+	uint8_t boot_disable_bits;
+	//uint32_t boot_from_uart_disable       :1;   /**< Boot from UART disable */
+	//uint32_t boot_from_smbus_disable      :1;   /**< Boot from SMBUS disable */
+	//uint32_t boot_from_i3c_disable        :1;   /**< Boot from I3C disable */
+	//uint32_t failover_to_uart_disable     :1;   /**< Failover to UART disable */
+	//uint32_t failover_to_smbus_disable    :1;   /**< Failover to SMBUS disable */
+	//uint32_t failover_to_i3c_disable      :1;   /**< Failover to I3C disable */
+	//uint32_t rsvd_2                       :2;   /**< reserved */
+
+	/* DWORD 1-4: token signals */
+	uint32_t token_signals[DEVICE_CONFIG_TOKEN_SIGNALS_SIZE_DWORDS];
+
+	/* DWORD 5: number of keys to program */
+	uint32_t key_prog_num;
+
+	/* DWORD 6-...: key data (up to 12 keys, 17 DWORDs each) */
+	struct switchtec_device_config_key_data key_data[DEVICE_CONFIG_MAX_KEY_SLOTS];
+};
+
+/**
+ * @brief Full device configuration get response
+ */
+struct switchtec_device_config_get {
+	uint32_t config_state;
+	struct switchtec_device_config_dev_settings dev_settings;
+	struct switchtec_device_config_customer_settings customer_settings;
+	struct switchtec_device_config_secure_settings secure_settings;
+};
+/* DWORD 0 */
+//uint32_t dev_config_prog      :1;  /**< device config programmed */
+//uint32_t customer_config_prog :1;  /**< customer config programmed */
+//uint32_t security_config_prog :1;  /**< security config programmed */
+//uint32_t rsvd                 :29; /**< reserved */
+
+/**
+ * @brief DOK signature data for validation
+ */
+struct switchtec_dok_signature {
+	uint8_t sub_cmd;               /**< Sub command (0x1) */
+	uint8_t sig_type;              /**< Signature type */
+	uint8_t reserved[2];           /**< Reserved */
+	uint32_t total_len;            /**< Signature total length */
+	uint32_t total_crc;            /**< Signature total CRC */
+	uint32_t data_len;             /**< Data length in current packet */
+	uint32_t offset;               /**< Offset in current packet */
+	uint8_t sig_data[512];         /**< Signature data */
+};
+
+/**
+ * @brief DOK key add command structure
+ */
+struct switchtec_dok_key_add {
+	uint8_t sub_cmd;
+	uint8_t key_slot;
+	uint8_t uid_psid_type;
+	uint8_t reserved;
+	uint32_t uid[SWITCHTEC_UID_DWORD_S];
+	uint32_t psid[SWITCHTEC_PSID_DWORD_S];
+	uint32_t key_hash[DEVICE_CONFIG_KEY_HASH_SIZE_DWORDS];
+};
+
+/**
+ * @brief DOK key revoke command structure
+ */
+struct switchtec_dok_key_revoke {
+	uint8_t sub_cmd;
+	uint8_t key_slot;
+	uint8_t uid_psid_type;
+	uint8_t reserved;
+	uint32_t uid[SWITCHTEC_UID_DWORD_S];
+	uint32_t psid[SWITCHTEC_PSID_DWORD_S];
+};
+
 int switchtec_sn_ver_get(struct switchtec_dev *dev,
 			 struct switchtec_sn_ver_info *info);
 int switchtec_security_config_get(struct switchtec_dev *dev,
@@ -375,5 +549,21 @@ switchtec_security_state_has_kmsk(struct switchtec_security_cfg_state *state,
 				  struct switchtec_kmsk *kmsk);
 int switchtec_security_settings_get(struct switchtec_dev *dev,
 					struct switchtec_security_cfg_state *state);
+/* Function prototypes for device configuration */
+int switchtec_device_config_get(struct switchtec_dev *dev,
+				struct switchtec_device_config_get *config);
+int switchtec_device_config_set_dev(struct switchtec_dev *dev,
+				    struct switchtec_device_config_dev_settings *settings);
+int switchtec_device_config_set_customer(struct switchtec_dev *dev,
+					 struct switchtec_device_config_customer_settings *settings);
+int switchtec_device_config_set_security(struct switchtec_dev *dev,
+					 struct switchtec_device_config_secure_settings *settings);
+/* Function prototypes for DOK configuration */
+int switchtec_dok_config_signature(struct switchtec_dev *dev,
+				   struct switchtec_dok_signature *sig);
+int switchtec_dok_config_key_add(struct switchtec_dev *dev,
+				 struct switchtec_dok_key_add *key_add);
+int switchtec_dok_config_key_revoke(struct switchtec_dev *dev,
+				    struct switchtec_dok_key_revoke *key_revoke);
 
 #endif // LIBSWITCHTEC_MFG_H

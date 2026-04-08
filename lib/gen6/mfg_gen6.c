@@ -70,6 +70,85 @@ struct get_cfgs_reply_gen6 {
 	uint32_t otp_key_hash[SWITCHTEC_KMSK_NUM_GEN6][SWITCHTEC_KMSK_LEN_DWORDS];
 };
 
+int switchtec_device_config_get_gen6(struct switchtec_dev *dev,
+				struct switchtec_device_config_get *config)
+{
+	uint32_t subcmd = DEVICE_CONFIG_SUB_CMD_GET;
+	return switchtec_mfg_cmd(dev, MRPC_DEVICE_CONFIG, &subcmd, sizeof(subcmd),
+				config, sizeof(*config));
+}
+
+int switchtec_device_config_set_dev_gen6(struct switchtec_dev *dev,
+				    struct switchtec_device_config_dev_settings *settings)
+{
+	struct {
+		uint8_t subcmd;
+		uint8_t reserved[3];
+		struct switchtec_device_config_dev_settings settings;
+	} cmd;
+
+	memset(&cmd, 0, sizeof(cmd));
+	cmd.subcmd = DEVICE_CONFIG_SUB_CMD_SET_DEVICE;
+	memcpy(&cmd.settings, settings, sizeof(*settings));
+
+	return switchtec_mfg_cmd(dev, MRPC_DEVICE_CONFIG, &cmd, sizeof(cmd),
+				NULL, 0);
+}
+
+int switchtec_device_config_set_customer_gen6(struct switchtec_dev *dev,
+					 struct switchtec_device_config_customer_settings *settings)
+{
+	struct {
+		uint8_t subcmd;
+		uint8_t reserved[3];
+		struct switchtec_device_config_customer_settings settings;
+	} cmd;
+
+	memset(&cmd, 0, sizeof(cmd));
+	cmd.subcmd = DEVICE_CONFIG_SUB_CMD_SET_CUSTOMER;
+	memcpy(&cmd.settings, settings, sizeof(*settings));
+
+	return switchtec_mfg_cmd(dev, MRPC_DEVICE_CONFIG, &cmd, sizeof(cmd),
+				NULL, 0);
+}
+
+int switchtec_device_config_set_security_gen6(struct switchtec_dev *dev,
+					 struct switchtec_device_config_secure_settings *settings)
+{
+	struct {
+		uint8_t subcmd;
+		uint8_t reserved[3];
+		struct switchtec_device_config_secure_settings settings;
+	} cmd;
+
+	memset(&cmd, 0, sizeof(cmd));
+	cmd.subcmd = DEVICE_CONFIG_SUB_CMD_SET_SECURITY;
+	memcpy(&cmd.settings, settings, sizeof(*settings));
+
+	return switchtec_mfg_cmd(dev, MRPC_DEVICE_CONFIG, &cmd, sizeof(cmd),
+				NULL, 0);
+}
+
+int switchtec_dok_config_signature_gen6(struct switchtec_dev *dev,
+				   struct switchtec_dok_signature *sig)
+{
+	return switchtec_mfg_cmd(dev, MRPC_DOK_CONFIG, sig,
+				20 + sig->data_len, NULL, 0);
+}
+
+int switchtec_dok_config_key_add_gen6(struct switchtec_dev *dev,
+				 struct switchtec_dok_key_add *key_add)
+{
+	return switchtec_mfg_cmd(dev, MRPC_DOK_CONFIG, key_add, sizeof(*key_add),
+				NULL, 0);
+}
+
+int switchtec_dok_config_key_revoke_gen6(struct switchtec_dev *dev,
+				    struct switchtec_dok_key_revoke *key_revoke)
+{
+	return switchtec_mfg_cmd(dev, MRPC_DOK_CONFIG, key_revoke, sizeof(*key_revoke), NULL, 0);
+}
+
 static int get_configs_gen6(struct switchtec_dev *dev,
 			    struct get_cfgs_reply_gen6 *cfgs)
 {
