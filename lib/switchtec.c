@@ -1034,10 +1034,8 @@ static int read_app_log_defs(FILE *log_def_file, struct log_defs *defs)
 		if (!tok)
 			continue;
 
-		if (!parse_int(tok, &mod_id)) {
-			errno = SWITCHTEC_ERR_LOG_DEF_DATA_INVAL;
-			goto err_free_log_defs;
-		}
+		if (!parse_int(tok, &mod_id))
+			continue;
 
 		/* reallocate more log definition entries if needed */
 		if (mod_id > defs->num_alloc) {
@@ -1052,10 +1050,8 @@ static int read_app_log_defs(FILE *log_def_file, struct log_defs *defs)
 		if (!tok)
 			continue;
 
-		if (!parse_int(tok, &num_entries)) {
-			errno = SWITCHTEC_ERR_LOG_DEF_DATA_INVAL;
-			goto err_free_log_defs;
-		}
+		if (!parse_int(tok, &num_entries))
+			continue;
 
 		/*
 		 * Skip this module if it has already been done. This can happen
