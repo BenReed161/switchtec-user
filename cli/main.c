@@ -1901,6 +1901,47 @@ static int fw_img_info(int argc, char **argv)
 	return 0;
 }
 
+static struct switchtec_fw_part_type *
+get_part_type(struct switchtec_fw_part_summary *sum, int type)
+{
+	switch (type) {
+	case SWITCHTEC_FW_TYPE_BOOT:	return &sum->boot;
+	case SWITCHTEC_FW_TYPE_MAP:	return &sum->map;
+	case SWITCHTEC_FW_TYPE_IMG:	return &sum->img;
+	case SWITCHTEC_FW_TYPE_CFG:	return &sum->cfg;
+	case SWITCHTEC_FW_TYPE_KEY:	return &sum->key;
+	case SWITCHTEC_FW_TYPE_BL2:	return &sum->bl2;
+	case SWITCHTEC_FW_TYPE_RIOT:	return &sum->riot;
+	case SWITCHTEC_FW_TYPE_CERT:	return &sum->cert;
+	case SWITCHTEC_FW_TYPE_DBG:	return &sum->dbg;
+	default:			return NULL;
+	}
+}
+
+static int check_inavtive_part_running(struct switchtec_dev *dev, int type, 
+				       struct switchtec_fw_image_info *info)
+{
+	struct switchtec_fw_part_summary *sum;
+	struct switchtec_fw_part_type *ptype;
+
+	sum = switchtec_fw_part_summary(dev);
+	if (sum) {
+		ptype = get_part_type(sum, type);
+		if (ptype && ptype->inactive &&
+			ptype->inactive->running) {
+			fprintf(stderr,
+				"\nfirmware update: the inactive %s partition is currently running.\n"
+				"Use 'fw-toggle' to swap the active partition before updating.\n",
+				switchtec_fw_image_type(info));
+			switchtec_fw_part_summary_free(sum);
+			return -1;
+		}
+		switchtec_fw_part_summary_free(sum);
+		return 0;
+	}
+	return -1;
+}
+
 static const char *fw_active_string(struct switchtec_fw_image_info *inf)
 {
 	return inf->active ? " - Active" : "";
@@ -2172,6 +2213,12 @@ static int fw_update(int argc, char **argv)
 			fclose(cfg.fimg);
 			return ret;
 		}
+	}
+
+	ret = check_inavtive_part_running(cfg.dev, type, &info);
+	if (ret) {
+		fclose(cfg.fimg);
+		return ret;
 	}
 
 	progress_start();
