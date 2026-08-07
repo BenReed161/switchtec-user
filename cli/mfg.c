@@ -2320,6 +2320,89 @@ static int device_config_get(int argc, char **argv)
 	return 0;
 }
 
+#define CMD_DESC_DEVICE_CONFIG_INFO "display information for a device config binary file"
+
+static int device_config_info(int argc, char **argv)
+{
+	int ret;
+	FILE *fp;
+	uint8_t magic[4];
+	struct switchtec_device_config_dev_settings dev_settings = {};
+	struct switchtec_device_config_customer_settings customer_settings = {};
+	struct switchtec_device_config_get_sec sec_cfg = {};
+
+	const char *desc = CMD_DESC_DEVICE_CONFIG_INFO "\n\n"
+			   "Decodes and displays the contents of a device config "
+			   "binary file. Automatically detects the config type "
+			   "(device, customer, or security) from the file header.";
+
+	static struct {
+		const char *cfg_file;
+	} cfg = {};
+
+	const struct argconfig_options opts[] = {
+		{"config_file", .cfg_type = CFG_STRING,
+		  .value_addr = &cfg.cfg_file,
+		  .argument_type = required_positional,
+		  .help = "device config binary file to display"},
+		{NULL}
+	};
+
+	argconfig_parse(argc, argv, desc, opts, &cfg, sizeof(cfg));
+
+	fp = fopen(cfg.cfg_file, "rb");
+	if (!fp) {
+		perror(cfg.cfg_file);
+		return -1;
+	}
+
+	if (fread(magic, 1, sizeof(magic), fp) != sizeof(magic)) {
+		fprintf(stderr, "Error: unable to read file header\n");
+		fclose(fp);
+		return -1;
+	}
+	rewind(fp);
+
+	if (!memcmp(magic, DEVICE_CONFIG_FILE_MAGIC_DEV, 4)) {
+		ret = switchtec_read_dev_cfg_file_dev(fp, &dev_settings);
+		if (ret) {
+			fprintf(stderr, "Error: '%s' is not a valid device config file\n",
+				cfg.cfg_file);
+			fclose(fp);
+			return -1;
+		}
+		print_device_settings_only(&dev_settings);
+	} else if (!memcmp(magic, DEVICE_CONFIG_FILE_MAGIC_CUSTOMER, 4)) {
+		ret = switchtec_read_dev_cfg_file_customer(fp, &customer_settings);
+		if (ret) {
+			fprintf(stderr, "Error: '%s' is not a valid customer config file\n",
+				cfg.cfg_file);
+			fclose(fp);
+			return -1;
+		}
+		print_customer_settings(&customer_settings);
+	} else if (!memcmp(magic, DEVICE_CONFIG_FILE_MAGIC_SECURITY, 4)) {
+		ret = switchtec_read_dev_cfg_file_security(fp,
+							   &sec_cfg.secure_settings);
+		if (ret) {
+			fprintf(stderr, "Error: '%s' is not a valid security config file\n",
+				cfg.cfg_file);
+			fclose(fp);
+			return -1;
+		}
+		print_security_settings_only(&sec_cfg);
+		printf("\nNote: DOK status is only available from live hardware.\n");
+	} else {
+		fprintf(stderr, "Error: '%s' has unrecognized file magic '%.4s'\n",
+			cfg.cfg_file, magic);
+		fclose(fp);
+		return -1;
+	}
+
+	fclose(fp);
+	return 0;
+}
+
 #define CMD_DESC_DEVICE_CONFIG_SET_DEVICE "set device settings (Gen6 only)"
 
 static int device_config_set_device(int argc, char **argv)
@@ -3558,6 +3641,7 @@ static const struct cmd commands[] = {
 	CMD(kmsk_entry_add, CMD_DESC_KMSK_ENTRY_ADD),
 	CMD(debug_unlock_token, CMD_DESC_DEBUG_TOKEN),
 	CMD(device_config_get, CMD_DESC_DEVICE_CONFIG_GET),
+	CMD(device_config_info, CMD_DESC_DEVICE_CONFIG_INFO),
 	CMD(device_config_set_device, CMD_DESC_DEVICE_CONFIG_SET_DEVICE),
 	CMD(device_config_set_customer, CMD_DESC_DEVICE_CONFIG_SET_CUSTOMER),
 	CMD(device_config_set_security, CMD_DESC_DEVICE_CONFIG_SET_SECURITY),
