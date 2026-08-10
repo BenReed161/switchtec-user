@@ -2016,6 +2016,295 @@ static int ep_bar_write(int argc, char **argv)
 	return ret;
 }
 
+#define CMD_DESC_ROUTE_RULE_ADD "add a custom routing rule"
+
+static int route_rule_add(int argc, char **argv)
+{
+	int ret;
+	struct argconfig_choice tbl_type_choices[] = {
+		{"AR", SWITCHTEC_ROUTE_RULE_TBL_AR, "Address Resolution"},
+		{"ID", SWITCHTEC_ROUTE_RULE_TBL_ID, "ID Resolution"},
+		{}
+	};
+
+	static struct {
+		struct switchtec_dev *dev;
+		int tbl_type;
+		int index;
+		int src_port;
+		int dst_port;
+		unsigned long long start_addr;
+		unsigned long long end_addr;
+		int bdf_start;
+		int bdf_end;
+	} cfg = {
+		.tbl_type = -1,
+		.index = -1,
+		.src_port = -1,
+		.dst_port = -1,
+		.bdf_start = -1,
+		.bdf_end = -1,
+	};
+
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{"table", 't', "TYPE", CFG_CHOICES, &cfg.tbl_type,
+		 required_argument, .choices = tbl_type_choices,
+		 .require_in_usage = 1, .help = "table type"},
+		{"index", 'i', "NUM", CFG_NONNEGATIVE, &cfg.index,
+		 required_argument, .require_in_usage = 1,
+		 .help = "rule entry index"},
+		{"src_port", 's', "NUM", CFG_NONNEGATIVE, &cfg.src_port,
+		 required_argument, .require_in_usage = 1,
+		 .help = "source physical port ID"},
+		{"dst_port", 'd', "NUM", CFG_NONNEGATIVE, &cfg.dst_port,
+		 required_argument, .require_in_usage = 1,
+		 .help = "destination physical port ID"},
+		{"start_addr", 'a', "ADDR", CFG_LONG_LONG, &cfg.start_addr,
+		 required_argument,
+		 .help = "start address (64-bit hex, for AR table)"},
+		{"end_addr", 'e', "ADDR", CFG_LONG_LONG, &cfg.end_addr,
+		 required_argument,
+		 .help = "end address (64-bit hex, for AR table)"},
+		{"bdf_start", 'b', "BDF", CFG_NONNEGATIVE, &cfg.bdf_start,
+		 required_argument,
+		 .help = "start BDF (16-bit hex, for ID table)"},
+		{"bdf_end", 'B', "BDF", CFG_NONNEGATIVE, &cfg.bdf_end,
+		 required_argument,
+		 .help = "end BDF (16-bit hex, for ID table)"},
+		{NULL}};
+
+	argconfig_parse(argc, argv, CMD_DESC_ROUTE_RULE_ADD, opts,
+			&cfg, sizeof(cfg));
+
+	if (cfg.tbl_type == -1) {
+		fprintf(stderr, "The --table|-t argument is required!\n");
+		return 1;
+	}
+
+	if (cfg.index == -1) {
+		fprintf(stderr, "The --index|-i argument is required!\n");
+		return 1;
+	}
+
+	if (cfg.src_port == -1) {
+		fprintf(stderr, "The --src_port|-s argument is required!\n");
+		return 1;
+	}
+
+	if (cfg.dst_port == -1) {
+		fprintf(stderr, "The --dst_port|-d argument is required!\n");
+		return 1;
+	}
+
+	if (cfg.tbl_type == SWITCHTEC_ROUTE_RULE_TBL_AR) {
+		struct switchtec_route_rule_ar rule = {
+			.src_port = cfg.src_port,
+			.dst_port = cfg.dst_port,
+			.index = cfg.index,
+			.start_addr = cfg.start_addr,
+			.end_addr = cfg.end_addr,
+		};
+
+		ret = switchtec_route_rule_add_ar(cfg.dev, &rule);
+	} else if (cfg.tbl_type == SWITCHTEC_ROUTE_RULE_TBL_ID) {
+		if (cfg.bdf_start == -1 || cfg.bdf_end == -1) {
+			fprintf(stderr,
+				"--bdf_start and --bdf_end are required for ID table!\n");
+			return 1;
+		}
+
+		struct switchtec_route_rule_id rule = {
+			.src_port = cfg.src_port,
+			.dst_port = cfg.dst_port,
+			.index = cfg.index,
+			.bdf_start = cfg.bdf_start,
+			.bdf_end = cfg.bdf_end,
+		};
+
+		ret = switchtec_route_rule_add_id(cfg.dev, &rule);
+	} else {
+		fprintf(stderr, "Unsupported table type\n");
+		return 1;
+	}
+
+	if (ret) {
+		switchtec_perror("route_rule_add");
+		return ret;
+	}
+
+	printf("Route rule added successfully.\n");
+	return 0;
+}
+
+#define CMD_DESC_ROUTE_RULE_DEL "delete a custom routing rule"
+
+static int route_rule_del(int argc, char **argv)
+{
+	int ret;
+	struct argconfig_choice tbl_type_choices[] = {
+		{"AR", SWITCHTEC_ROUTE_RULE_TBL_AR, "Address Resolution"},
+		{"AT", SWITCHTEC_ROUTE_RULE_TBL_AT, "Address Translation"},
+		{"ID", SWITCHTEC_ROUTE_RULE_TBL_ID, "ID Resolution"},
+		{"ADV_AR", SWITCHTEC_ROUTE_RULE_TBL_ADV_AR,
+		 "Advanced Address Resolution"},
+		{"ADV_ID", SWITCHTEC_ROUTE_RULE_TBL_ADV_ID,
+		 "Advanced ID Resolution"},
+		{}
+	};
+
+	static struct {
+		struct switchtec_dev *dev;
+		int tbl_type;
+		int index;
+		int port_or_stack;
+	} cfg = {
+		.tbl_type = -1,
+		.index = -1,
+		.port_or_stack = -1,
+	};
+
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{"table", 't', "TYPE", CFG_CHOICES, &cfg.tbl_type,
+		 required_argument, .choices = tbl_type_choices,
+		 .require_in_usage = 1, .help = "table type"},
+		{"index", 'i', "NUM", CFG_NONNEGATIVE, &cfg.index,
+		 required_argument, .require_in_usage = 1,
+		 .help = "rule entry index"},
+		{"port_or_stack", 's', "NUM", CFG_NONNEGATIVE,
+		 &cfg.port_or_stack, required_argument,
+		 .require_in_usage = 1,
+		 .help = "source port (AR/ID) or stack ID (AT/ADV_AR/ADV_ID)"},
+		{NULL}};
+
+	argconfig_parse(argc, argv, CMD_DESC_ROUTE_RULE_DEL, opts,
+			&cfg, sizeof(cfg));
+
+	if (cfg.tbl_type == -1) {
+		fprintf(stderr, "The --table|-t argument is required!\n");
+		return 1;
+	}
+
+	if (cfg.index == -1) {
+		fprintf(stderr, "The --index|-i argument is required!\n");
+		return 1;
+	}
+
+	if (cfg.port_or_stack == -1) {
+		fprintf(stderr,
+			"The --port_or_stack|-s argument is required!\n");
+		return 1;
+	}
+
+	ret = switchtec_route_rule_delete(cfg.dev, cfg.tbl_type,
+					  cfg.port_or_stack, cfg.index);
+	if (ret) {
+		switchtec_perror("route_rule_del");
+		return ret;
+	}
+
+	printf("Route rule deleted successfully.\n");
+	return 0;
+}
+
+#define CMD_DESC_ROUTE_RULE_SHOW "display a custom routing rule"
+
+static int route_rule_show(int argc, char **argv)
+{
+	int ret;
+	struct argconfig_choice tbl_type_choices[] = {
+		{"AR", SWITCHTEC_ROUTE_RULE_TBL_AR, "Address Resolution"},
+		{"ID", SWITCHTEC_ROUTE_RULE_TBL_ID, "ID Resolution"},
+		{}
+	};
+
+	static struct {
+		struct switchtec_dev *dev;
+		int tbl_type;
+		int index;
+		int src_port;
+	} cfg = {
+		.tbl_type = -1,
+		.index = -1,
+		.src_port = -1,
+	};
+
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{"table", 't', "TYPE", CFG_CHOICES, &cfg.tbl_type,
+		 required_argument, .choices = tbl_type_choices,
+		 .require_in_usage = 1, .help = "table type"},
+		{"index", 'i', "NUM", CFG_NONNEGATIVE, &cfg.index,
+		 required_argument, .require_in_usage = 1,
+		 .help = "rule entry index"},
+		{"src_port", 's', "NUM", CFG_NONNEGATIVE, &cfg.src_port,
+		 required_argument, .require_in_usage = 1,
+		 .help = "source physical port ID"},
+		{NULL}};
+
+	argconfig_parse(argc, argv, CMD_DESC_ROUTE_RULE_SHOW, opts,
+			&cfg, sizeof(cfg));
+
+	if (cfg.tbl_type == -1) {
+		fprintf(stderr, "The --table|-t argument is required!\n");
+		return 1;
+	}
+
+	if (cfg.index == -1) {
+		fprintf(stderr, "The --index|-i argument is required!\n");
+		return 1;
+	}
+
+	if (cfg.src_port == -1) {
+		fprintf(stderr, "The --src_port|-s argument is required!\n");
+		return 1;
+	}
+
+	if (cfg.tbl_type == SWITCHTEC_ROUTE_RULE_TBL_AR) {
+		struct switchtec_route_rule_ar rule = {};
+
+		ret = switchtec_route_rule_fetch_ar(cfg.dev, cfg.src_port,
+						    cfg.index, &rule);
+		if (ret) {
+			switchtec_perror("route_rule_show");
+			return ret;
+		}
+
+		printf("AR Rule (Index %d, Src Port %d):\n",
+		       cfg.index, cfg.src_port);
+		printf("  Status:      %s\n",
+		       rule.status ? "Active" : "Inactive");
+		printf("  Dst Port:    %d\n", rule.dst_port);
+		printf("  Start Addr:  0x%016llx\n",
+		       (unsigned long long)rule.start_addr);
+		printf("  End Addr:    0x%016llx\n",
+		       (unsigned long long)rule.end_addr);
+	} else if (cfg.tbl_type == SWITCHTEC_ROUTE_RULE_TBL_ID) {
+		struct switchtec_route_rule_id rule = {};
+
+		ret = switchtec_route_rule_fetch_id(cfg.dev, cfg.src_port,
+						    cfg.index, &rule);
+		if (ret) {
+			switchtec_perror("route_rule_show");
+			return ret;
+		}
+
+		printf("ID Rule (Index %d, Src Port %d):\n",
+		       cfg.index, cfg.src_port);
+		printf("  Status:      %s\n",
+		       rule.status ? "Active" : "Inactive");
+		printf("  Dst Port:    %d\n", rule.dst_port);
+		printf("  BDF Start:   0x%04x\n", rule.bdf_start);
+		printf("  BDF End:     0x%04x\n", rule.bdf_end);
+	} else {
+		fprintf(stderr, "Unsupported table type for show\n");
+		return 1;
+	}
+
+	return 0;
+}
+
 static const struct cmd commands[] = {
 	{"topo_info", topo_info, CMD_DESC_TOPO_INFO},
 	{"gfms_bind", gfms_bind, CMD_DESC_GFMS_BIND},
@@ -2032,6 +2321,9 @@ static const struct cmd commands[] = {
 	{"ep_bar_read", ep_bar_read, CMD_DESC_EP_BAR_READ},
 	{"ep_bar_write", ep_bar_write, CMD_DESC_EP_BAR_WRITE},
 	{"device_manage", device_manage, CMD_DESC_DEV_MANAGE},
+	{"route_rule_add", route_rule_add, CMD_DESC_ROUTE_RULE_ADD},
+	{"route_rule_del", route_rule_del, CMD_DESC_ROUTE_RULE_DEL},
+	{"route_rule_show", route_rule_show, CMD_DESC_ROUTE_RULE_SHOW},
 	{}
 };
 

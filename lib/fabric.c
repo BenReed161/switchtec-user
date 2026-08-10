@@ -1635,3 +1635,195 @@ int switchtec_nvme_admin_passthru(struct switchtec_dev *dev, uint16_t pdfid,
 
 	return ret;
 }
+
+/* MRPC 0x149 DW0 field positions */
+#define ROUTE_RULE_SUBCMD_SHIFT		0
+#define ROUTE_RULE_SRC_PORT_SHIFT	8
+#define ROUTE_RULE_DST_PORT_SHIFT	16
+#define ROUTE_RULE_STACK_ID_SHIFT	16
+#define ROUTE_RULE_TBL_ID_SHIFT		24
+
+/* MRPC 0x149 response field masks */
+#define ROUTE_RULE_STATUS_MASK		0xFF
+#define ROUTE_RULE_DPORT_SHIFT		8
+#define ROUTE_RULE_DPORT_MASK		0xFF
+#define ROUTE_RULE_BDF_MASK		0xFFFF
+#define ROUTE_RULE_BDF_END_SHIFT	16
+#define ROUTE_RULE_ADDR_LOW_MASK	0xFFFFFFFF
+#define ROUTE_RULE_ADDR_HIGH_SHIFT	32
+
+/**
+ * @brief Add an Address Resolution (AR) routing rule
+ * @param[in] dev	Switchtec device handle
+ * @param[in] rule	AR rule parameters
+ * @return 0 on success, error code on failure
+ */
+int switchtec_route_rule_add_ar(struct switchtec_dev *dev,
+				struct switchtec_route_rule_ar *rule)
+{
+	struct {
+		uint32_t dw[6];
+	} cmd;
+
+	memset(&cmd, 0, sizeof(cmd));
+
+	cmd.dw[0] = MRPC_ROUTE_RULE_ADD |
+		    ((uint32_t)rule->src_port << ROUTE_RULE_SRC_PORT_SHIFT) |
+		    ((uint32_t)rule->dst_port << ROUTE_RULE_DST_PORT_SHIFT) |
+		    ((uint32_t)SWITCHTEC_ROUTE_RULE_TBL_AR << ROUTE_RULE_TBL_ID_SHIFT);
+	cmd.dw[1] = rule->index;
+	cmd.dw[2] = (uint32_t)(rule->start_addr & ROUTE_RULE_ADDR_LOW_MASK);
+	cmd.dw[3] = (uint32_t)(rule->start_addr >> ROUTE_RULE_ADDR_HIGH_SHIFT);
+	cmd.dw[4] = (uint32_t)(rule->end_addr & ROUTE_RULE_ADDR_LOW_MASK);
+	cmd.dw[5] = (uint32_t)(rule->end_addr >> ROUTE_RULE_ADDR_HIGH_SHIFT);
+
+	return switchtec_cmd(dev, MRPC_USER_ROUTE_RULE,
+			     &cmd, sizeof(cmd), NULL, 0);
+}
+
+/**
+ * @brief Add an ID Resolution (ID) routing rule
+ * @param[in] dev	Switchtec device handle
+ * @param[in] rule	ID rule parameters
+ * @return 0 on success, error code on failure
+ */
+int switchtec_route_rule_add_id(struct switchtec_dev *dev,
+				struct switchtec_route_rule_id *rule)
+{
+	struct {
+		uint32_t dw[3];
+	} cmd;
+
+	memset(&cmd, 0, sizeof(cmd));
+
+	cmd.dw[0] = MRPC_ROUTE_RULE_ADD |
+		    ((uint32_t)rule->src_port << ROUTE_RULE_SRC_PORT_SHIFT) |
+		    ((uint32_t)rule->dst_port << ROUTE_RULE_DST_PORT_SHIFT) |
+		    ((uint32_t)SWITCHTEC_ROUTE_RULE_TBL_ID << ROUTE_RULE_TBL_ID_SHIFT);
+	cmd.dw[1] = rule->index;
+	cmd.dw[2] = (uint32_t)rule->bdf_start |
+		    ((uint32_t)rule->bdf_end << ROUTE_RULE_BDF_END_SHIFT);
+
+	return switchtec_cmd(dev, MRPC_USER_ROUTE_RULE,
+			     &cmd, sizeof(cmd), NULL, 0);
+}
+
+/**
+ * @brief Delete a routing rule from any table type
+ * @param[in] dev		Switchtec device handle
+ * @param[in] tbl_type		Table type (AR, AT, ID, ADV_AR, ADV_ID)
+ * @param[in] port_or_stack	Source port (AR/ID) or stack ID (AT/ADV_AR/ADV_ID)
+ * @param[in] index		Rule entry index
+ * @return 0 on success, error code on failure
+ */
+int switchtec_route_rule_delete(struct switchtec_dev *dev,
+				uint8_t tbl_type, uint8_t port_or_stack,
+				uint16_t index)
+{
+	struct {
+		uint32_t dw[2];
+	} cmd;
+	uint32_t byte2;
+
+	memset(&cmd, 0, sizeof(cmd));
+
+	if (tbl_type == SWITCHTEC_ROUTE_RULE_TBL_AR ||
+	    tbl_type == SWITCHTEC_ROUTE_RULE_TBL_ID)
+		byte2 = (uint32_t)port_or_stack << ROUTE_RULE_SRC_PORT_SHIFT;
+	else
+		byte2 = (uint32_t)port_or_stack << ROUTE_RULE_STACK_ID_SHIFT;
+
+	cmd.dw[0] = MRPC_ROUTE_RULE_DELETE | byte2 |
+		    ((uint32_t)tbl_type << ROUTE_RULE_TBL_ID_SHIFT);
+	cmd.dw[1] = index;
+
+	return switchtec_cmd(dev, MRPC_USER_ROUTE_RULE,
+			     &cmd, sizeof(cmd), NULL, 0);
+}
+
+/**
+ * @brief Fetch an Address Resolution (AR) routing rule
+ * @param[in]  dev		Switchtec device handle
+ * @param[in]  src_port		Source port ID
+ * @param[in]  index		Rule entry index
+ * @param[out] rule		Fetched rule data
+ * @return 0 on success, error code on failure
+ */
+int switchtec_route_rule_fetch_ar(struct switchtec_dev *dev,
+				  uint8_t src_port, uint16_t index,
+				  struct switchtec_route_rule_ar *rule)
+{
+	int ret;
+	struct {
+		uint32_t dw[2];
+	} cmd;
+	struct {
+		uint32_t dw[5];
+	} resp;
+
+	memset(&cmd, 0, sizeof(cmd));
+	memset(&resp, 0, sizeof(resp));
+
+	cmd.dw[0] = MRPC_ROUTE_RULE_FETCH |
+		    ((uint32_t)src_port << ROUTE_RULE_SRC_PORT_SHIFT) |
+		    ((uint32_t)SWITCHTEC_ROUTE_RULE_TBL_AR << ROUTE_RULE_TBL_ID_SHIFT);
+	cmd.dw[1] = index;
+
+	ret = switchtec_cmd(dev, MRPC_USER_ROUTE_RULE,
+			    &cmd, sizeof(cmd), &resp, sizeof(resp));
+	if (ret)
+		return ret;
+
+	rule->status = resp.dw[0] & ROUTE_RULE_STATUS_MASK;
+	rule->dst_port = (resp.dw[0] >> ROUTE_RULE_DPORT_SHIFT) &
+			 ROUTE_RULE_DPORT_MASK;
+	rule->start_addr = ((uint64_t)resp.dw[1] << ROUTE_RULE_ADDR_HIGH_SHIFT) |
+			   resp.dw[2];
+	rule->end_addr = ((uint64_t)resp.dw[3] << ROUTE_RULE_ADDR_HIGH_SHIFT) |
+			 resp.dw[4];
+
+	return 0;
+}
+
+/**
+ * @brief Fetch an ID Resolution (ID) routing rule
+ * @param[in]  dev		Switchtec device handle
+ * @param[in]  src_port		Source port ID
+ * @param[in]  index		Rule entry index
+ * @param[out] rule		Fetched rule data
+ * @return 0 on success, error code on failure
+ */
+int switchtec_route_rule_fetch_id(struct switchtec_dev *dev,
+				  uint8_t src_port, uint16_t index,
+				  struct switchtec_route_rule_id *rule)
+{
+	int ret;
+	struct {
+		uint32_t dw[2];
+	} cmd;
+	struct {
+		uint32_t dw[2];
+	} resp;
+
+	memset(&cmd, 0, sizeof(cmd));
+	memset(&resp, 0, sizeof(resp));
+
+	cmd.dw[0] = MRPC_ROUTE_RULE_FETCH |
+		    ((uint32_t)src_port << ROUTE_RULE_SRC_PORT_SHIFT) |
+		    ((uint32_t)SWITCHTEC_ROUTE_RULE_TBL_ID << ROUTE_RULE_TBL_ID_SHIFT);
+	cmd.dw[1] = index;
+
+	ret = switchtec_cmd(dev, MRPC_USER_ROUTE_RULE,
+			    &cmd, sizeof(cmd), &resp, sizeof(resp));
+	if (ret)
+		return ret;
+
+	rule->status = resp.dw[0] & ROUTE_RULE_STATUS_MASK;
+	rule->dst_port = (resp.dw[0] >> ROUTE_RULE_DPORT_SHIFT) &
+			 ROUTE_RULE_DPORT_MASK;
+	rule->bdf_start = resp.dw[1] & ROUTE_RULE_BDF_MASK;
+	rule->bdf_end = (resp.dw[1] >> ROUTE_RULE_BDF_END_SHIFT) &
+			ROUTE_RULE_BDF_MASK;
+
+	return 0;
+}

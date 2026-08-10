@@ -709,6 +709,48 @@ int switchtec_nvme_admin_passthru(struct switchtec_dev *dev, uint16_t pdfid,
 				  size_t data_len, void *data,
 				  size_t *rsp_len, void *rsp);
 
+/********** USER DEFINED CUSTOM ROUTING RULES *********/
+
+enum switchtec_route_rule_tbl_type {
+	SWITCHTEC_ROUTE_RULE_TBL_AR = 0,
+	SWITCHTEC_ROUTE_RULE_TBL_AT = 1,
+	SWITCHTEC_ROUTE_RULE_TBL_ID = 2,
+	SWITCHTEC_ROUTE_RULE_TBL_ADV_AR = 3,
+	SWITCHTEC_ROUTE_RULE_TBL_ADV_ID = 4,
+};
+
+struct switchtec_route_rule_ar {
+	uint8_t src_port;
+	uint8_t dst_port;
+	uint8_t index;
+	uint8_t status;
+	uint64_t start_addr;
+	uint64_t end_addr;
+};
+
+struct switchtec_route_rule_id {
+	uint8_t src_port;
+	uint8_t dst_port;
+	uint16_t index;
+	uint8_t status;
+	uint16_t bdf_start;
+	uint16_t bdf_end;
+};
+
+int switchtec_route_rule_add_ar(struct switchtec_dev *dev,
+				struct switchtec_route_rule_ar *rule);
+int switchtec_route_rule_add_id(struct switchtec_dev *dev,
+				struct switchtec_route_rule_id *rule);
+int switchtec_route_rule_delete(struct switchtec_dev *dev,
+				uint8_t tbl_type, uint8_t port_or_stack,
+				uint16_t index);
+int switchtec_route_rule_fetch_ar(struct switchtec_dev *dev,
+				  uint8_t src_port, uint16_t index,
+				  struct switchtec_route_rule_ar *rule);
+int switchtec_route_rule_fetch_id(struct switchtec_dev *dev,
+				  uint8_t src_port, uint16_t index,
+				  struct switchtec_route_rule_id *rule);
+
 #ifdef __cplusplus
 }
 #endif
