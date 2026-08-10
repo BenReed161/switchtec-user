@@ -49,6 +49,9 @@
 #include <string.h>
 #include <strings.h>
 
+#define PRINT_DOK_STS 1
+#define SKIP_DOK_STS 0
+
 static const struct argconfig_choice recovery_mode_choices[] = {
 	{"I2C", SWITCHTEC_BL2_RECOVERY_I2C, "I2C"},
 	{"XMODEM", SWITCHTEC_BL2_RECOVERY_XMODEM, "XModem"},
@@ -2177,7 +2180,8 @@ static const char *dok_status_to_str(uint32_t status)
 	}
 }
 
-static void print_security_settings_only(struct switchtec_device_config_get_sec *sec_cfg)
+static void print_security_settings_only(struct switchtec_device_config_get_sec *sec_cfg, 
+					 int print_dok_status)
 {
 	int i, j;
 	uint32_t dok_status[DEVICE_CONFIG_MAX_KEY_SLOTS] = {
@@ -2234,10 +2238,11 @@ static void print_security_settings_only(struct switchtec_device_config_get_sec 
 		printf("\n");
 	}
 
-	printf("\n--DOK Key Status--\n");
-	for (i = 0; i < DEVICE_CONFIG_MAX_KEY_SLOTS; i++)
-		printf("DOK%02d: %s (%u)\n", i,
-		       dok_status_to_str(dok_status[i]), dok_status[i]);
+	if (print_dok_status) {
+		printf("\n--DOK Key Status--\n");
+		for (i = 0; i < DEVICE_CONFIG_MAX_KEY_SLOTS; i++)
+			printf("DOK%02d: %s (%u)\n", i, dok_status_to_str(dok_status[i]), dok_status[i]);
+	}
 }
 
 #define CMD_DESC_DEVICE_CONFIG_GET "get device configuration (Gen6 only)"
@@ -2300,7 +2305,7 @@ static int device_config_get(int argc, char **argv)
 			switchtec_perror("mfg device-config-get -4");
 			return ret;
 		}
-		print_security_settings_only(&sec_config);
+		print_security_settings_only(&sec_config, PRINT_DOK_STS);
 	} else if (cfg.subcmd_get_customer) {
 		ret = switchtec_device_config_get_customer(cfg.dev, &customer_settings);
 		if (ret) {
@@ -2390,8 +2395,7 @@ static int device_config_info(int argc, char **argv)
 			fclose(fp);
 			return -1;
 		}
-		print_security_settings_only(&sec_cfg);
-		printf("\nNote: DOK status is only available from live hardware.\n");
+		print_security_settings_only(&sec_cfg, SKIP_DOK_STS);
 	} else {
 		fprintf(stderr, "Error: '%s' has unrecognized file magic '%.4s'\n",
 			cfg.cfg_file, magic);
@@ -2493,15 +2497,7 @@ static int device_config_set_device(int argc, char **argv)
 		settings.i3c_rcvry_bus = cfg.i3c_rcvry_bus & 0x3;
 	}
 
-	printf("Setting device configuration:\n");
-	printf("  TWI OCP Address:        0x%03x\n", settings.twi_ocp_addr);
-	printf("  TWI MRPC Address:       0x%03x\n", settings.twi_mrpc_addr);
-	printf("  TWI Recovery Addr Type: %d\n", settings.twi_rcvry_addr_type);
-	printf("  TWI Recovery Bus:       %d\n", settings.twi_rcvry_bus);
-	printf("  I3C PID:                0x%08x%04x\n",
-	       settings.i3c_pid_hi, settings.i3c_pid_lo);
-	printf("  I3C 7-bit Address:      0x%02x\n", settings.i3c_addr_7bit);
-	printf("  I3C Recovery Bus:       %d\n", settings.i3c_rcvry_bus);
+	print_device_settings_only(&settings);
 
 	if (!cfg.assume_yes) {
 		fprintf(stderr,
@@ -2645,24 +2641,7 @@ static int device_config_set_customer(int argc, char **argv)
 		settings.customer_ecc_fields[3][1] = (cfg.cseccf3 >> 32) & 0xFFFFFFFFULL;
 	}
 
-	printf("Setting customer configuration:\n");
-	printf("  Device ID:            0x%04x\n", settings.device_id);
-	printf("  Vendor ID:            0x%04x\n", settings.vendor_id);
-	printf("  Revision ID:          0x%04x\n", settings.revision_id);
-	printf("  Subsystem ID:         0x%04x\n", settings.subsystem_id);
-	printf("  Subsystem Vendor ID:  0x%04x\n", settings.subsystem_vendor_id);
-	printf("  CSF0:                 0x%08x\n", settings.customer_fields[0]);
-	printf("  CSF1:                 0x%08x\n", settings.customer_fields[1]);
-	printf("  CSF2:                 0x%08x\n", settings.customer_fields[2]);
-	printf("  CSF3:                 0x%08x\n", settings.customer_fields[3]);
-	printf("  CSECCF0:              0x%08x%08x\n",
-	       settings.customer_ecc_fields[0][1], settings.customer_ecc_fields[0][0]);
-	printf("  CSECCF1:              0x%08x%08x\n",
-	       settings.customer_ecc_fields[1][1], settings.customer_ecc_fields[1][0]);
-	printf("  CSECCF2:              0x%08x%08x\n",
-	       settings.customer_ecc_fields[2][1], settings.customer_ecc_fields[2][0]);
-	printf("  CSECCF3:              0x%08x%08x\n",
-	       settings.customer_ecc_fields[3][1], settings.customer_ecc_fields[3][0]);
+	print_customer_settings(&settings);
 
 	if (!cfg.assume_yes) {
 		fprintf(stderr,
@@ -2709,7 +2688,7 @@ static int parse_key_hash(const char *hex, uint32_t *out)
 
 static int device_config_set_security(int argc, char **argv)
 {
-	int ret, i, j;
+	int ret, i;
 	int key_count = 0;
 	struct switchtec_device_config_secure_settings settings = {};
 	FILE *fp;
@@ -2888,29 +2867,11 @@ static int device_config_set_security(int argc, char **argv)
 		settings.key_prog_num = key_count;
 	}
 
-	printf("Setting security configuration:\n");
-	printf("  Command Map:              0x%03x\n", settings.command_map);
-	printf("  Static Token Disable:     %d\n", settings.static_token_disable);
-	printf("  PSID Only Token Disable:  %d\n", settings.psid_only_token_disable);
-	printf("  UID Only Token Disable:   %d\n", settings.uid_only_token_disable);
-	printf("  PSID+UID Token Disable:   %d\n", settings.psid_uid_token_disable);
-	printf("  Boot from UART Disable:   %d\n", settings.boot_from_uart_disable);
-	printf("  Boot from SMBus Disable:  %d\n", settings.boot_from_smbus_disable);
-	printf("  Boot from I3C Disable:    %d\n", settings.boot_from_i3c_disable);
-	printf("  Failover to UART Disable: %d\n", settings.failover_to_uart_disable);
-	printf("  Failover to SMBus Disable: %d\n", settings.failover_to_smbus_disable);
-	printf("  Failover to I3C Disable:  %d\n", settings.failover_to_i3c_disable);
-	printf("  PSID0:                    %08lx%08lx%08lx%08lx\n",
-	       cfg.psid0_0, cfg.psid0_1, cfg.psid0_2, cfg.psid0_3);
-	printf("  Keys to program:          %d\n", key_count);
-	for (i = 0; i < key_count; i++) {
-		printf("  Key%d:                     ", settings.key_data[i].index + 1);
-		for (j = 0; j < DEVICE_CONFIG_KEY_HASH_SIZE_DWORDS; j++) {
-			if (j == 8)
-				printf("\n                            ");
-			printf("%08x", be32toh(settings.key_data[i].hash[j]));
-		}
-		printf("\n");
+	{
+		struct switchtec_device_config_get_sec sec_cfg = {};
+
+		sec_cfg.secure_settings = settings;
+		print_security_settings_only(&sec_cfg, SKIP_DOK_STS);
 	}
 
 	if (!cfg.assume_yes) {
