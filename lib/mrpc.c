@@ -111,4 +111,5 @@ const struct switchtec_mrpc switchtec_mrpc_table[MRPC_MAX_ID] = {
 	M(BOOTUP_RESUME,		"Bootup Resume"),
 	M(SECURITY_CONFIG_GET_GEN5,	"Secure Configuration Get (Gen5)"),
 	M(SECURITY_CONFIG_SET_GEN5,	"Secure Configuration Set (Gen5)"),
+	M(USER_ROUTE_RULE,		"User Defined Custom Routing Rules"),
 };

@@ -858,6 +858,21 @@ const char *switchtec_strerror(void)
 		default: break;
 		}
 		break;
+	case MRPC_USER_ROUTE_RULE:
+		switch (err) {
+		case ERR_ROUTE_RULE_INVALID_PORT_ID:
+			msg = "Invalid port ID"; break;
+		case ERR_ROUTE_RULE_INVALID_TBL_TYPE:
+			msg = "Invalid table type"; break;
+		case ERR_ROUTE_RULE_INVALID_ENTRY_IDX:
+			msg = "Invalid entry index"; break;
+		case ERR_ROUTE_RULE_INVALID_STACK_ID:
+			msg = "Invalid stack ID"; break;
+		case ERR_ROUTE_RULE_INVALID_PARAMS:
+			msg = "Invalid parameters"; break;
+		default: break;
+		}
+		break;
 	case MRPC_GEN5_EYE_CAPTURE:
 		switch (err) {
 		case ERR_EYE_CAP_LANE_MASK_INVAL:
