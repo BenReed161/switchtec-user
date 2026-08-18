@@ -1384,6 +1384,9 @@ int switchtec_fw_file_info(int fd, struct switchtec_fw_image_info *info)
 	char magic[4];
 	int ret;
 
+	if (info)
+		memset(info, 0, sizeof(*info));
+
 	ret = read(fd, &magic, sizeof(magic));
 	lseek(fd, 0, SEEK_SET);
 
