@@ -33,6 +33,7 @@
 #include <switchtec/errors.h>
 #include <switchtec/utils.h>
 #include <switchtec/pci.h>
+#include <switchtec/endian.h>
 
 #include <locale.h>
 #include <time.h>
