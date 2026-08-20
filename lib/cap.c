@@ -33,6 +33,7 @@
 #include "switchtec/switchtec.h"
 #include "switchtec/mrpc.h"
 #include "switchtec_priv.h"
+#include <switchtec/endian.h>
 
 #include <stddef.h>
 #include <errno.h>
