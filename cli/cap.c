@@ -360,8 +360,8 @@ static int multicast_set(int argc, char **argv)
 	}
 
 	if (cfg.overlay_size != -1 &&
-	    (cfg.overlay_size < 0 || cfg.overlay_size > 30)) {
-		fprintf(stderr, "--overlay-size must be between 0 and 30\n");
+	    (cfg.overlay_size < 0 || cfg.overlay_size > 63)) {
+		fprintf(stderr, "--overlay-size must be between 0 and 63\n");
 		return -1;
 	}
 
