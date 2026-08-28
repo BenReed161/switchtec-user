@@ -154,6 +154,61 @@ int switchtec_spi_flash_read(struct switchtec_dev *dev, uint32_t offset,
 int switchtec_spi_flash_write(struct switchtec_dev *dev, uint32_t offset,
 			       size_t len, const void *buf);
 
+ /** Returned by switchtec_spi_flash_download() when verify is true and the
+ *  post-write read-back did not match the source data. Deliberately
+ *  outside the MRPC_ERR_SPI_FLASH_* range (all 0x64000+, always positive)
+ *  so callers can tell a verify mismatch apart from a firmware-rejected
+ *  sub-command with a simple sign check it is a host-side-only
+ *  comparison failure, not something the device itself returned. */
+#define SWITCHTEC_SPI_FLASH_VERIFY_MISMATCH  (-2)
+
+/**
+ * @brief Download (erase + write, optionally verify) a raw image from a
+ *        file into the SPI flash at a given offset
+ *
+ * Three phases, each independently progress-reported:
+ *   1. Erase every sector the [offset, offset + len) range covers. The
+ *      sector stride comes from switchtec_spi_flash_get_erase_size() at
+ *      the range's start offset. Skipped entirely if erase is false
+ *   2. Write the file's len bytes starting at offset, chunked at
+ *      SWITCHTEC_SPI_FLASH_WRITE_MAX per MRPC call.
+ *   3. If verify is true, read the [offset, offset + len) range back and 
+ *      byte-compare it against the same file, rewound and re-read a chunk 
+ *      at a time.
+ *
+ * @param[in] dev     Switchtec device handle
+ * @param[in] fimg    Open, readable, seekable file
+ * @param[in] offset  Destination byte offset. Does not need to be
+ *                    sector-aligned.
+ * @param[in] len     Number of bytes to write
+ * @param[in] erase   If true, erase every sector the write range covers first. 
+ * 		      If false, the caller asserts the destination is already 
+ * 		      erased and phase 1 is skipped entirely.
+ * @param[in] verify  If true, run phase 3 (read-back + compare) after the
+ *                    write completes.
+ * @param[in] erase_progress_callback   Optional; called after each sector
+ *                                     erase with (sectors erased so far,
+ *                                     total sectors to erase). Never
+ *                                     called if erase is false.
+ * @param[in] write_progress_callback   Optional; called after each write
+ *                                     chunk with (bytes written so far,
+ *                                     len).
+ * @param[in] verify_progress_callback  Optional; called after each verify
+ *                                     chunk with (bytes verified so far,
+ *                                     len). Never called if verify is
+ *                                     false.
+ * In the case of write failure, some chunks may have already been written
+ * to the destination; no rollback is attempted. Callers requiring
+ * atomicity must retry the whole download and re-erase first.
+ *
+ * @return 0 on success.
+ */
+int switchtec_spi_flash_download(struct switchtec_dev *dev, FILE *fimg,
+				  uint32_t offset, size_t len,
+				  bool erase, bool verify,
+				  void (*erase_progress_callback)(int cur, int tot),
+				  void (*write_progress_callback)(int cur, int tot),
+				  void (*verify_progress_callback)(int cur, int tot));
 #ifdef __cplusplus
 }
 #endif
