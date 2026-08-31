@@ -25,11 +25,13 @@
 #include "commands.h"
 #include "argconfig.h"
 #include "common.h"
+#include "progress.h"
 
 #include <switchtec/switchtec.h>
 #include <switchtec/flash.h>
 #include <switchtec/errors.h>
 
+#include <stdbool.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -347,6 +349,218 @@ static int spi_flash_write(int argc, char **argv)
 	return 0;
 }
 
+#define CMD_DESC_SPI_FLASH_DOWNLOAD \
+	"erase, write, and (optionally) verify a raw image into the SPI " \
+	"flash in one operation (destructive) -- the spi_flash " \
+	"counterpart of fw-update"
+
+static bool dl_erase_started;
+static bool dl_write_started;
+static bool dl_verify_started;
+
+static void dl_erase_progress(int cur, int tot)
+{
+	if (!dl_erase_started) {
+		printf("Erasing %d sector%s...\n", tot, tot == 1 ? "" : "s");
+		progress_start();
+		dl_erase_started = true;
+	}
+	progress_update_norate(cur, tot);
+	if (cur >= tot)
+		progress_finish(0);
+}
+
+static void dl_write_progress(int cur, int tot)
+{
+	if (!dl_write_started) {
+		printf("Writing...\n");
+		progress_start();
+		dl_write_started = true;
+	}
+	progress_update(cur, tot);
+	if (cur >= tot)
+		progress_finish(0);
+}
+
+static void dl_verify_progress(int cur, int tot)
+{
+	if (!dl_verify_started) {
+		printf("Verifying...\n");
+		progress_start();
+		dl_verify_started = true;
+	}
+	progress_update(cur, tot);
+	if (cur >= tot)
+		progress_finish(0);
+}
+
+static int spi_flash_download(int argc, char **argv)
+{
+	int ret;
+	long len;
+	FILE *fimg;
+	void (*erase_cb)(int, int);
+	void (*write_cb)(int, int);
+	void (*verify_cb)(int, int);
+
+	static struct {
+		struct switchtec_dev *dev;
+		unsigned long offset;
+		int in_fd;
+		int no_erase;
+		int verify;
+		int assume_yes;
+		int no_progress_bar;
+	} cfg = {
+		.in_fd = -1,
+	};
+	const struct argconfig_options opts[] = {
+		DEVICE_OPTION,
+		{"offset", .cfg_type = CFG_LONG_SUFFIX,
+		 .value_addr = &cfg.offset,
+		 .argument_type = required_positional,
+		 .help = "destination byte offset (need not be "
+			 "sector-aligned -- the covering sector range is "
+			 "erased first)"},
+		{"filename", .cfg_type = CFG_FD_RD,
+		 .value_addr = &cfg.in_fd,
+		 .argument_type = required_positional,
+		 .help = "input file"},
+		{"no-erase", 'n', "", CFG_NONE, &cfg.no_erase, no_argument,
+		 "skip erasing first (caller asserts the destination is "
+		 "already erased)"},
+		{"verify", 'V', "", CFG_NONE, &cfg.verify, no_argument,
+		 "read the range back after writing and confirm it is "
+		 "byte-identical to the input file"},
+		{"yes", 'y', "", CFG_NONE, &cfg.assume_yes, no_argument,
+		 "assume yes when prompted"},
+		{"no-progress", 'p', "", CFG_NONE, &cfg.no_progress_bar,
+		 no_argument, "don't print progress bars"},
+		{NULL}};
+
+	argconfig_parse(argc, argv, CMD_DESC_SPI_FLASH_DOWNLOAD, opts,
+			&cfg, sizeof(cfg));
+
+	dl_erase_started = false;
+	dl_write_started = false;
+	dl_verify_started = false;
+
+	if (cfg.offset >= SWITCHTEC_SPI_FLASH_SIZE) {
+		fprintf(stderr,
+			"offset 0x%lx is outside the 0x%lx-byte SPI flash\n",
+			cfg.offset,
+			(unsigned long)SWITCHTEC_SPI_FLASH_SIZE);
+		close(cfg.in_fd);
+		return 1;
+	}
+
+	len = lseek(cfg.in_fd, 0, SEEK_END);
+	if (len < 0) {
+		perror("lseek");
+		close(cfg.in_fd);
+		return 1;
+	}
+	lseek(cfg.in_fd, 0, SEEK_SET);
+
+	if (!len) {
+		fprintf(stderr, "input file is empty\n");
+		close(cfg.in_fd);
+		return 1;
+	}
+
+	if ((unsigned long)len >
+	    (unsigned long)(SWITCHTEC_SPI_FLASH_SIZE - cfg.offset)) {
+		fprintf(stderr,
+			"range [0x%lx, 0x%lx) exceeds the 0x%lx-byte SPI flash\n",
+			cfg.offset,
+			cfg.offset + (unsigned long)len,
+			(unsigned long)SWITCHTEC_SPI_FLASH_SIZE);
+		return 1;
+	}
+
+	printf("This will %swrite %ld bytes to 0x%08lx-0x%08lx on %s%s.\n",
+	       cfg.no_erase ? "" : "erase and ",
+	       len, cfg.offset, cfg.offset + (unsigned long)len - 1,
+	       switchtec_name(cfg.dev),
+	       cfg.verify ? ", then verify it" : "");
+
+	printf("Note: this command has no partition- or "
+	       "region-awareness and no secure-state gate -- a "
+	       "misdirected download can corrupt or brick the "
+	       "device.\n");
+
+	ret = ask_if_sure(cfg.assume_yes);
+	if (ret) {
+		close(cfg.in_fd);
+		return ret;
+	}
+
+	fimg = fdopen(cfg.in_fd, "rb");
+	if (!fimg) {
+		perror("fdopen");
+		close(cfg.in_fd);
+		return 1;
+	}
+
+	erase_cb  = cfg.no_progress_bar ? NULL : dl_erase_progress;
+	write_cb  = cfg.no_progress_bar ? NULL : dl_write_progress;
+	verify_cb = cfg.no_progress_bar ? NULL : dl_verify_progress;
+
+	ret = switchtec_spi_flash_download(cfg.dev, fimg, cfg.offset,
+					   (size_t)len, !cfg.no_erase,
+					   cfg.verify, erase_cb, write_cb,
+					   verify_cb);
+	fclose(fimg);
+
+	if (ret == SWITCHTEC_SPI_FLASH_VERIFY_MISMATCH) {
+		fprintf(stderr,
+			"Error: verify failed -- the range read back does "
+			"not match the input file.\n");
+		return 1;
+	}
+	if (ret) {
+		/* ret > 0: a raw MRPC_ERR_SPI_FLASH_* code returned directly
+		 * by switchtec_spi_flash_erase_sector()/_get_erase_size()
+		 * errno was NOT set on this path, do not fall through to 
+		 * switchtec_perror().
+		 * ret == -1: a generic failure from the spi read/write 
+		 * (or this function's fseek/malloc/fread checks) the real 
+		 * MRPC code, if any, only survives in errno (set by the 
+		 * transport backend).
+		 */
+
+		if (ret > 0) {
+			if (ret == MRPC_ERR_SPI_FLASH_INVALID_SUBCMD)
+				fprintf(stderr,
+					"Error: SPI flash Erase Sector/Get "
+					"Erase Size is not available on this "
+					"firmware build (rejected as "
+					"reserved/unimplemented).\n");
+			else
+				fprintf(stderr,
+					"Error: spi-flash-download failed "
+					"during erase phase with MRPC code "
+					"0x%x\n", ret);
+		} else {
+			if (ERRNO_MRPC(errno) ==
+			    MRPC_ERR_SPI_FLASH_INVALID_SUBCMD)
+				fprintf(stderr,
+					"Error: SPI flash Write/Read is not "
+					"available on this firmware build "
+					"(rejected as "
+					"reserved/unimplemented).\n");
+			else
+				switchtec_perror("spi-flash-download");
+		}
+		return 1;
+	}
+
+	printf("Wrote %ld bytes to 0x%08lx-0x%08lx%s.\n", len, cfg.offset,
+	       cfg.offset + (unsigned long)len - 1,
+	       cfg.verify ? " (verified)" : "");
+	return 0;
+}
+
 #define CMD_DESC_SPI_FLASH_GET_ERASE_SIZE \
 	"query the erase-sector size covering a given SPI flash offset"
 
@@ -398,6 +612,7 @@ static const struct cmd commands[] = {
 	{"erase", spi_flash_erase, CMD_DESC_SPI_FLASH_ERASE},
 	{"read", spi_flash_read, CMD_DESC_SPI_FLASH_READ},
 	{"write", spi_flash_write, CMD_DESC_SPI_FLASH_WRITE},
+	{"download", spi_flash_download, CMD_DESC_SPI_FLASH_DOWNLOAD},
 	{"get_erase_size", spi_flash_get_erase_size,
 	 CMD_DESC_SPI_FLASH_GET_ERASE_SIZE},
 	{}

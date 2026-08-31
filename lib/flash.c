@@ -40,6 +40,7 @@
 
 #include <string.h>
 #include <errno.h>
+#include <stdlib.h>
 
 struct spi_flash_erase_in {
 	uint8_t  sub_cmd;
@@ -223,4 +224,155 @@ int switchtec_spi_flash_write(struct switchtec_dev *dev, uint32_t offset,
 	}
 
 	return (int)total_wrote;
+}
+
+int switchtec_spi_flash_download(struct switchtec_dev *dev, FILE *fimg,
+				  uint32_t offset, size_t len,
+				  bool erase, bool verify,
+				  void (*erase_progress_callback)(int cur, int tot),
+				  void (*write_progress_callback)(int cur, int tot),
+				  void (*verify_progress_callback)(int cur, int tot))
+{
+	int ret;
+	uint64_t range_end;	/* offset + len, as uint64_t to avoid
+				 * uint32_t wraparound while checking it */
+	uint32_t sector_size;
+	uint64_t sector_start, sector_end_excl;
+	uint32_t sector;
+	int total_sectors, sectors_done;
+	unsigned char *wbuf, *rbuf, *fbuf;
+	size_t done;
+
+	if (!len) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	range_end = (uint64_t)offset + (uint64_t)len;
+	if (range_end > SWITCHTEC_SPI_FLASH_SIZE) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	/* Phase 1: Erase */
+	if (erase) {
+		ret = switchtec_spi_flash_get_erase_size(dev, offset,
+							 &sector_size);
+		if (ret)
+			return ret;
+		if (!sector_size) {
+			errno = EIO;
+			return -1;
+		}
+
+		sector_start = (uint64_t)offset -
+			       ((uint64_t)offset % sector_size);
+		/* Round (range_end - 1) up to the next sector boundary
+		 * range_end is already known <= SWITCHTEC_SPI_FLASH_SIZE
+		 * above, and len is non-zero, so range_end - 1 cannot
+		 * underflow.
+		 */
+		sector_end_excl = ((range_end - 1) / sector_size + 1) *
+				   sector_size;
+
+		total_sectors = (int)((sector_end_excl - sector_start) /
+				      sector_size);
+		sectors_done = 0;
+
+		for (sector = (uint32_t)sector_start;
+		     sector < sector_end_excl;
+		     sector += sector_size) {
+			ret = switchtec_spi_flash_erase_sector(dev, sector,
+								NULL);
+			if (ret)
+				return ret;
+
+			sectors_done++;
+			if (erase_progress_callback)
+				erase_progress_callback(sectors_done,
+							 total_sectors);
+		}
+	}
+
+	/* Phase 2: Write */
+	if (fseek(fimg, 0, SEEK_SET) != 0)
+		return -1;
+
+	wbuf = malloc(SWITCHTEC_SPI_FLASH_WRITE_MAX);
+	if (!wbuf)
+		return -1;
+
+	done = 0;
+	while (done < len) {
+		size_t chunk_len = len - done;
+		if (chunk_len > SWITCHTEC_SPI_FLASH_WRITE_MAX)
+			chunk_len = SWITCHTEC_SPI_FLASH_WRITE_MAX;
+
+		if (fread(wbuf, 1, chunk_len, fimg) != chunk_len) {
+			free(wbuf);
+			return -1;
+		}
+
+		ret = switchtec_spi_flash_write(dev, offset + (uint32_t)done,
+						chunk_len, wbuf);
+		if (ret < 0) {
+			free(wbuf);
+			return -1;
+		}
+
+		done += chunk_len;
+		if (write_progress_callback)
+			write_progress_callback((int)done, (int)len);
+	}
+	free(wbuf);
+
+	if (!verify)
+		return 0;
+
+	/* Phase 3: Read */
+	if (fseek(fimg, 0, SEEK_SET) != 0)
+		return -1;
+
+	rbuf = malloc(SWITCHTEC_SPI_FLASH_READ_MAX);
+	fbuf = malloc(SWITCHTEC_SPI_FLASH_READ_MAX);
+	if (!rbuf || !fbuf) {
+		free(rbuf);
+		free(fbuf);
+		return -1;
+	}
+
+	done = 0;
+	while (done < len) {
+		size_t chunk_len = len - done;
+		if (chunk_len > SWITCHTEC_SPI_FLASH_READ_MAX)
+			chunk_len = SWITCHTEC_SPI_FLASH_READ_MAX;
+
+		if (fread(fbuf, 1, chunk_len, fimg) != chunk_len) {
+			free(rbuf);
+			free(fbuf);
+			return -1;
+		}
+
+		ret = switchtec_spi_flash_read(dev, offset + (uint32_t)done,
+					       chunk_len, rbuf);
+		if (ret < 0) {
+			free(rbuf);
+			free(fbuf);
+			return -1;
+		}
+
+		if (memcmp(rbuf, fbuf, chunk_len) != 0) {
+			free(rbuf);
+			free(fbuf);
+			return SWITCHTEC_SPI_FLASH_VERIFY_MISMATCH;
+		}
+
+		done += chunk_len;
+		if (verify_progress_callback)
+			verify_progress_callback((int)done, (int)len);
+	}
+
+	free(rbuf);
+	free(fbuf);
+	return 0;
 }
